@@ -1,4 +1,4 @@
-# Pinned to the versions the pilot was built and tested with.
+# Pinned to the versions this implementation was built and tested with.
 # torch is installed separately by setup.sh (CPU wheel).
 transformers==5.22.2
 subtext-codec==1.1.0
@@ -13,6 +13,8 @@ gymnasium==1.4.0
 tensorflow-cpu==2.21.0
 efficientnet==1.1.1
 imageio==2.38.1
+matplotlib==3.11.2
+gradio==6.31.0
 reedsolo
 psutil
 pytest

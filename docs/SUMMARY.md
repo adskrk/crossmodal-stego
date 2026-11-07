@@ -1,11 +1,11 @@
-# Pilot summary — for the faculty review
+# First-stage summary — for the faculty review
 
 **Project:** Reinforcement learning and LLMs for cross-modal steganography.
 One secret is split between an LLM-written paragraph and an RGB photo; a
 pooled warden inspects both; the sender chooses carriers to stay unnoticed.
 
 All numbers below come from `docs/RESULTS.md`, which `scripts/make_report.py`
-builds from saved experiment outputs. Pilot scale: 195 photo crops, 12 prompts,
+builds from saved experiment outputs. Small scale: 195 photo crops, 12 prompts,
 a small offline language model (Hugging Face was unreachable on the build machine).
 
 ## What works (built and tested)
@@ -20,7 +20,7 @@ a small offline language model (Hugging Face was unreachable on the build machin
 | Pooled warden (p-value fusion, 5% false alarms) | done | used in selection experiment |
 | Carrier selection: baselines + PPO (two designs) | done | held-out evaluation, two wardens |
 
-## Findings from the pilot (measured, not assumed)
+## Findings from the first-stage experiments (measured, not assumed)
 
 1. **A leak in the reused text coder, found and fixed.** subtext-codec sends its
    length field unscrambled, so equal-length messages open with the same words.
@@ -47,22 +47,24 @@ a small offline language model (Hugging Face was unreachable on the build machin
 6. **Choosing the carriers matters.** A one-line heuristic (busiest photo,
    highest-entropy prompt, C = 0) cut the flag rate from 10% / 4% (no selection)
    to 0% / 0% under both wardens on unseen photos and prompts.
-7. **RL has not beaten the heuristic yet, and the pilot shows why.** PPO v1
+7. **RL has not beaten the heuristic yet, and the experiments show why.** PPO v1
    (pick a slot) barely learned. PPO v2 (score candidates) exploited a blind
    spot of its training warden: it always chose C = 0.1, which warden A barely
-   notices and warden B catches 100% of the time. Grid search showed the same
-   overfitting (best under A, no better than no selection under B).
+   notices and warden B catches 100% of the time. Grid search was best under A; on
+   unseen Kodak photos under warden B its flag rate is 0.00 vs 0.04 for no
+   selection, but mean suspicion is about equal (0.80 vs 0.81), so its advantage
+   does not show up in suspicion.
 
 ## What is new here, honestly stated
 
 - Splitting a secret across carriers is **not** new (batch steganography,
   multimodal allocation papers).
-- What this pilot adds: a **text + image** system judged by a **pooled warden
+- What this implementation adds: a **text + image** system judged by a **pooled warden
   with two independent detector sets**, and measurements of three concrete
   failure modes (clear length field, tokenisation fingerprint, proxy-detector
   overfitting). Whether these are new to the literature still needs a proper
   search before any claim.
-- The RL contribution is **open**: the pilot shows the problem is real
+- The RL contribution is **open**: the first-stage results show the problem is real
   (selection helps) and hard (learned policies overfit the training warden).
 
 ## Limitations

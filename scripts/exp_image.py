@@ -1,4 +1,4 @@
-"""Pilot experiment: image channel quality, recovery and detectability.
+"""Proof-of-concept experiment: image channel quality, recovery and detectability.
 
 For every cover crop (sources A and B), every method (lsbr, lsbm, hill) and
 every rate (bits per colour value), embed a random payload, then record:

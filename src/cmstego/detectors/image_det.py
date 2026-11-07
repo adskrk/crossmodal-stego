@@ -100,7 +100,7 @@ class EffNetDetector:
 
     def score(self, images: Sequence[np.ndarray], batch: int = 16, chunk: int = 64) -> np.ndarray:
         # Convert to float32 one chunk at a time: stacking thousands of images at
-        # once ran the pilot out of memory.
+        # once ran the experiment out of memory.
         out = []
         for i in range(0, len(images), chunk):
             X = np.stack([im[: self.size, : self.size, :3] for im in images[i : i + chunk]]).astype("float32") / 255.0

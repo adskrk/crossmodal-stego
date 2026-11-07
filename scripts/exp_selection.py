@@ -1,4 +1,4 @@
-"""Pilot experiment: does choosing the carriers lower the pooled warden's suspicion?
+"""Proof-of-concept experiment: does choosing the carriers lower the pooled warden's suspicion?
 
 Strategies, all evaluated on the same held-out episodes (unseen photos and
 unseen prompts):
@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from cmstego.selection import pilot as P  # noqa: E402
+from cmstego.selection import carrier as P  # noqa: E402
 
 TRAIN_PROMPTS = list(range(0, 8))
 TEST_PROMPTS = list(range(8, 12))
@@ -66,7 +66,7 @@ def main():
         a, _ = model.predict(P.observation(T_, ep), deterministic=True)
         return int(a[0]), int(a[1]), int(a[2]), 1
 
-    # PPO v2: scoring policy (see pilot.score_action_to_choice), same budget of steps.
+    # PPO v2: scoring policy (see carrier.score_action_to_choice), same budget of steps.
     env2 = P.make_env(T, "train", TRAIN_PROMPTS, seed=1, action="score")
     model2 = PPO("MlpPolicy", env2, n_steps=512, batch_size=128, learning_rate=3e-4, ent_coef=0.0,
                  gamma=0.0, seed=1, verbose=0)

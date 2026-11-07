@@ -1,4 +1,4 @@
-"""Pilot experiment: text channel capacity, KL, recovery and detectability.
+"""Proof-of-concept experiment: text channel capacity, KL, recovery and detectability.
 
 For each prompt and each OD budget C, hide random payloads (standing in for
 whitened fragments) and decode them again. For every stego-text, also sample a

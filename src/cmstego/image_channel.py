@@ -73,7 +73,7 @@ def capacity_bits(cover: np.ndarray, method: str) -> int:
 
     For HILL + STC the limit is set by *usable* values. Saturated areas (blown-out
     sky) and perfectly flat areas (black borders) give STC no room, and above
-    the limit it has no solution. Found by the pilot experiment on Kodak photo 20
+    the limit it has no solution. Found by the image experiment on Kodak photo 20
     and the retina photo.
     """
     if method in ("lsbr", "lsbm"):

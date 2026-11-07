@@ -39,7 +39,7 @@ class SendConfig:
     C: float = 0.0
     top_k: int = 64
     max_text_tokens: int = 150
-    text_guard: str = "filter"  # "filter" (subtext-codec) or "retry" (OD-Stega style); pilot found equal detectability, filter is cheaper
+    text_guard: str = "filter"  # "filter" (subtext-codec) or "retry" (OD-Stega style); experiments found equal detectability, filter is cheaper
     text_share: Optional[float] = None  # None = fill-text rule; else fraction of secret bytes
 
 

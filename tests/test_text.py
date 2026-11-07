@@ -47,7 +47,7 @@ def test_edge_messages(lm):
 
 
 def test_message_longer_than_context_window(lm):
-    # Regression test: the pilot's text experiment crashed when a stego-text ran
+    # Regression test: the text experiment crashed when a stego-text ran
     # past the model's context length. The rolling window must keep it exact.
     model, tok = lm
     limit = tc.context_limit(model)
@@ -70,7 +70,7 @@ def test_keyed_roundtrip(lm, guard):
 
 
 def test_clear_header_leak_and_nonce_fix(lm):
-    # Pilot finding: without a nonce, equal-length messages start with identical
+    # Experimental finding: without a nonce, equal-length messages start with identical
     # bits (the length field), hence identical opening text. The nonce fixes it.
     model, tok = lm
     rng = random.Random(5)

@@ -12,10 +12,10 @@ rolling context window and tokenizer-stability filter. We change three things:
    OD-Stega's Theorem 1: this temperature form maximises entropy under the KL
    budget. T is found by bisection. C = 0 gives T = 1.
 
-2. Nonce + whitening of the whole bitstream (pilot finding). subtext-codec sends
+2. Nonce + whitening of the whole bitstream (experimental finding). subtext-codec sends
    its length field in the clear, so equal-length messages start with identical
    bits and therefore identical opening tokens — a detector spots this almost
-   immediately (held-out AUC about 0.95 in our first pilot run). With a key, the
+   immediately (held-out AUC about 0.95 in our first run). With a key, the
    bitstream becomes:  nonce (32 random bits) || XOR(length || crc || data,
    SHAKE-256(key || nonce)).  Every message now starts differently.
 
@@ -24,7 +24,7 @@ rolling context window and tokenizer-stability filter. We change three things:
      "filter": subtext-codec's guard — only offer tokens that survive. It
                works, but stego-text can then *never* contain those tokens while
                ordinary samples sometimes do: a one-sided fingerprint (in our
-               pilot, 44% of ordinary 90-token samples contained one).
+               first-stage results, 44% of ordinary 90-token samples contained one).
      "retry":  OD-Stega's approach — keep the full top-k distribution and, if
                the finished text does not re-tokenise to the same ids, pick a new
                nonce and encode again. Needs a key (the nonce is what changes).

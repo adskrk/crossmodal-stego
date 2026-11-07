@@ -1,4 +1,4 @@
-# How the pilot works — plain-language guide
+# How the system works — plain-language guide
 
 This is for you to read before the faculty review. Each section says what a
 part does, why it is built that way, and questions you may be asked.
@@ -82,7 +82,7 @@ back as the same token — otherwise the receiver would see different tokens).
    distribution. That includes truncation to the top-64 tokens, the
    tokenisation guard, the temperature and rounding — nothing is left out.
 
-3. **Nonce + whitening (found by the pilot).** subtext-codec puts the message
+3. **Nonce + whitening (found by experiment).** subtext-codec puts the message
    length at the very start of the bitstream, unscrambled. Equal-length messages
    therefore start with the same bits — and the same opening words. Our first
    detector run caught this at AUC 0.96. Now the bitstream starts with 32
@@ -101,7 +101,7 @@ back as the same token — otherwise the receiver would see different tokens).
 
 **Possible questions.**
 - *Is it provably undetectable?* — No. Low KL is necessary but not sufficient.
-  Our pilot is a concrete example: KL vs ordinary sampling was only 0.016
+  Our first-stage results are a concrete example: KL vs ordinary sampling was only 0.016
   bits/token at C = 0, yet a white-box detector reached AUC 0.71, because of
   the tokenisation fingerprint above. KL(stego‖cover) is small, but
   KL(cover‖stego) is infinite: covers contain events stego-text never has.
@@ -127,7 +127,7 @@ For a random message at α bits per value, about half the touched values
 change, so MSE ≈ α/2 and PSNR ≈ 10·log₁₀(255² / (α/2)), which is above 50 dB.
 A test checks this formula. So PSNR does not tell the methods apart; detectors do.
 
-**Capacity rule (found by the pilot).** Photos with blown-out sky or black
+**Capacity rule (found by experiment).** Photos with blown-out sky or black
 borders have many values that cannot change (stuck at 0/255, or in perfectly
 flat areas where HILL's cost is effectively infinite). pySTC failed silently on
 them. We now count only *usable* values, cap HILL + STC at 0.4 bits per usable
@@ -171,7 +171,7 @@ innocent carriers?"). The warden flags a pair if either p-value is below 2.5%
 
 ---
 
-## 6. Carrier selection and RL (`src/cmstego/selection/pilot.py`)
+## 6. Carrier selection and RL (`src/cmstego/selection/carrier.py`)
 
 **The decision.** For each message: pick 1 of 8 candidate photos, 1 of 4
 candidate prompts, and C from {0, 0.02, 0.05, 0.1}.
@@ -208,7 +208,7 @@ the best — strong but expensive).
 (one decision per episode), the simplest RL setting. The multi-step version —
 a warden that collects evidence over many messages — is the planned extension.
 
-**Possible question:** *So RL failed?* — In the pilot, yes: the hand-written
+**Possible question:** *So RL failed?* — In the first-stage results, yes: the hand-written
 heuristic was best. That is an honest, useful result: it shows (1) carrier
 choice matters, (2) a policy trained against one detector can be exploited by
 another, which is exactly the risk the two-warden design was built to expose.
@@ -216,10 +216,10 @@ The next step is training against an ensemble of detectors.
 
 ---
 
-## 7. What is honest to claim from the pilot
+## 7. What is honest to claim from the first-stage results
 
 See `docs/SUMMARY.md` (one page) and `docs/RESULTS.md` (all tables).
-Short version: the system works end to end with exact recovery; the pilot
+Short version: the system works end to end with exact recovery; the experiments
 found and fixed two real flaws, measured a tokenisation fingerprint, and
 showed carrier choice matters while RL is not yet better than a heuristic.
 Claims of "better" need the larger runs planned after approval.

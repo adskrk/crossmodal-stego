@@ -61,7 +61,7 @@ def test_psnr_matches_arithmetic_for_full_rate_lsbr():
 
 
 def test_flat_or_saturated_cover_refuses_instead_of_breaking():
-    # Regression test for the pilot's bug: a cover that is mostly blown-out or
+    # Regression test for an earlier bug: a cover that is mostly blown-out or
     # perfectly flat has almost no room for HILL + STC. It must refuse loudly.
     rng = np.random.default_rng(3)
     cover = np.zeros((128, 128, 3), dtype=np.uint8)
