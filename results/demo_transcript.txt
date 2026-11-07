@@ -1,0 +1,26 @@
+Loading language model: data/toy-lm
+
+SENDER  secret: 108 bytes
+  text  channel: 53 secret bytes in 136 tokens (3.71 payload bits/token incl. header; KL 0.3151 bits/token)
+  image channel: 55 secret bytes, method hill, PSNR 81.8 dB, SSIM 1.0000, 0.04% of colour values changed
+  SPA estimate of LSB-replacement payload: cover 0.052, stego 0.053
+  sender time: 7.3 s
+
+--- stego-text -------------------------------------------
+In this guide we explain however the SSTKSDMVLVAKUMUMKGSDT GONYUGING
+CopyrightSDATONERVAGERAMARCE AND ON ANY WILGEESONES PSREDI LIABILITY
+
+   Copyright 2012
+   ALORAUSED PARTY OF SUBSTIVD OF SUBSTITRUSED INTERS TTAUSED ANDINE GPEN OR
+
+   HOTIV OR TORT (c) All TEI RYGPTION) the following CYSUU General
+   Copyright
+----------------------------------------------------------
+
+RECEIVER (0.9 s)  text fragment ok: True, image fragment ok: True
+  recovered: 'Meet at the library at 5pm. Bring the notes for the BTP review, and do not tell anyone else about this plan.'
+  exact match: True
+ATTACK  one word of the text replaced
+
+RECEIVER (0.5 s)  text fragment ok: False, image fragment ok: True
+  FAILED: text fragment missing

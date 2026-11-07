@@ -1,0 +1,8 @@
+Loading weights:   0%|          | 0/52 [00:00<?, ?it/s]Loading weights: 100%|██████████| 52/52 [00:00<00:00, 33212.09it/s]
+C=0.0: done (1253s)
+C=0.1: done (5877s)
+C=0.0 ngram: AUC 0.522 on 84 held-out pairs
+C=0.0 likelihood: AUC 0.709 on 84 held-out pairs
+C=0.1 ngram: AUC 0.701 on 84 held-out pairs
+C=0.1 likelihood: AUC 0.991 on 84 held-out pairs
+total 5919s

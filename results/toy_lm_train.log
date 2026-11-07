@@ -1,0 +1,37 @@
+<unknown>:165: SyntaxWarning: invalid escape sequence '\S'
+<unknown>:166: SyntaxWarning: invalid escape sequence '\['
+<unknown>:207: SyntaxWarning: invalid escape sequence '\['
+<unknown>:456: SyntaxWarning: invalid escape sequence '\S'
+corpus: 6,017,161 chars
+
+
+
+tokens: 1,808,330
+[transformers] `loss_type=None` was set in the config but it is unrecognized. Using the default loss: `ForCausalLMLoss`.
+step 50 loss 6.293 (16s)
+step 100 loss 6.044 (32s)
+step 150 loss 5.880 (48s)
+step 200 loss 5.346 (64s)
+step 250 loss 5.277 (79s)
+step 300 loss 5.245 (94s)
+step 350 loss 4.782 (109s)
+step 400 loss 4.933 (126s)
+step 450 loss 4.588 (142s)
+step 500 loss 4.833 (171s)
+step 550 loss 4.684 (188s)
+step 600 loss 4.354 (204s)
+step 650 loss 4.378 (220s)
+step 700 loss 4.094 (237s)
+step 750 loss 3.840 (253s)
+step 800 loss 4.214 (271s)
+step 850 loss 4.349 (288s)
+step 900 loss 3.842 (304s)
+step 950 loss 4.591 (320s)
+step 1000 loss 4.403 (336s)
+step 1050 loss 3.782 (352s)
+step 1100 loss 4.010 (414s)
+step 1150 loss 3.869 (459s)
+step 1200 loss 3.947 (475s)
+step 1250 loss 3.843 (661s)
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00, 38.15it/s]
+saved to data/toy-lm after 1266 steps, final loss 3.595

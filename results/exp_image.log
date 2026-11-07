@@ -1,0 +1,30 @@
+195 covers
+  embedded 1/195 covers (5s)
+  embedded 11/195 covers (71s)
+  embedded 21/195 covers (139s)
+  embedded 31/195 covers (206s)
+  embedded 41/195 covers (273s)
+  embedded 51/195 covers (340s)
+  embedded 61/195 covers (406s)
+  embedded 71/195 covers (473s)
+  embedded 81/195 covers (543s)
+  embedded 91/195 covers (611s)
+  embedded 101/195 covers (684s)
+  embedded 111/195 covers (756s)
+  embedded 121/195 covers (818s)
+  embedded 131/195 covers (890s)
+  embedded 141/195 covers (962s)
+  embedded 151/195 covers (1033s)
+  embedded 161/195 covers (1104s)
+  embedded 171/195 covers (1169s)
+  embedded 181/195 covers (1238s)
+  embedded 191/195 covers (1306s)
+scoring with SPA and extracting SPAM features ...
+scoring with EfficientNet-lsbr ...
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794008218.252386    2473 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794008222.312951    2473 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+scoring with EfficientNet-lsbm ...
+scoring with EfficientNet-hill ...
+wrote 2330 rows (205 over-capacity attempts listed separately) in 2219s

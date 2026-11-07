@@ -1,0 +1,29 @@
+tables built: 195 covers, 168 held-out stego-texts (35s)
+PPO trained for 60000 steps in 973s
+PPO (scoring policy) trained for 60000 steps in 269s
+ split  strategy warden  mean_suspicion  flag_rate  evaluations_per_message  share_C>0
+  test      none      A           0.595      0.097                      1.0      0.000
+  test      none      B           0.814      0.041                      1.0      0.000
+  test    random      A           0.694      0.163                      1.0      0.488
+  test    random      B           0.895      0.494                      1.0      0.488
+  test heuristic      A           0.385      0.000                      1.0      0.000
+  test heuristic      B           0.746      0.000                      1.0      0.000
+  test    grid-A      A           0.168      0.000                     64.0      0.000
+  test    grid-A      B           0.801      0.003                     64.0      0.000
+  test       ppo      A           0.586      0.084                      1.0      0.000
+  test       ppo      B           0.799      0.020                      1.0      0.000
+  test ppo-score      A           0.643      0.002                      1.0      1.000
+  test ppo-score      B           0.987      1.000                      1.0      1.000
+test_B      none      A           0.854      0.162                      1.0      0.000
+test_B      none      B           0.777      0.076                      1.0      0.000
+test_B    random      A           0.879      0.222                      1.0      0.488
+test_B    random      B           0.877      0.499                      1.0      0.488
+test_B heuristic      A           0.845      0.008                      1.0      0.000
+test_B heuristic      B           0.739      0.000                      1.0      0.000
+test_B    grid-A      A           0.514      0.000                     64.0      0.077
+test_B    grid-A      B           0.790      0.086                     64.0      0.077
+test_B       ppo      A           0.857      0.149                      1.0      0.000
+test_B       ppo      B           0.773      0.046                      1.0      0.000
+test_B ppo-score      A           0.847      0.010                      1.0      1.000
+test_B ppo-score      B           0.986      1.000                      1.0      1.000
+total 1300s

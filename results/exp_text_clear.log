@@ -1,0 +1,15 @@
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Loading weights:   0%|          | 0/52 [00:00<?, ?it/s]Loading weights: 100%|██████████| 52/52 [00:00<00:00, 34105.36it/s]
+C=0.0: done (1301s)
+C=0.02: done (1561s)
+C=0.05: done (1756s)
+C=0.1: done (1940s)
+C=0.0 ngram: AUC 0.955 on 84 held-out pairs
+C=0.0 likelihood: AUC 0.961 on 84 held-out pairs
+C=0.02 ngram: AUC 0.949 on 84 held-out pairs
+C=0.02 likelihood: AUC 0.971 on 84 held-out pairs
+C=0.05 ngram: AUC 0.978 on 84 held-out pairs
+C=0.05 likelihood: AUC 0.944 on 84 held-out pairs
+C=0.1 ngram: AUC 0.971 on 84 held-out pairs
+C=0.1 likelihood: AUC 0.995 on 84 held-out pairs
+total 1949s

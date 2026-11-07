@@ -1,0 +1,5 @@
+C,detector,n_test_pairs,auc
+0.0,ngram,12,0.34027777777777773
+0.0,likelihood,12,0.7916666666666666
+0.1,ngram,12,0.5972222222222222
+0.1,likelihood,12,1.0

@@ -1,0 +1,6 @@
+Loading weights:   0%|          | 0/52 [00:00<?, ?it/s]Loading weights: 100%|██████████| 52/52 [00:00<00:00, 28069.99it/s]
+C=0.0: done (2325s)
+encode failures: 2
+C=0.0 ngram: AUC 0.465 on 36 held-out pairs
+C=0.0 likelihood: AUC 0.707 on 36 held-out pairs
+total 2412s

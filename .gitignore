@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+vendor/
+data/kodak/
+data/covers/
+data/toy-lm/corpus.txt
+results/*_images.npz
+results/smoke/
+demo_out*/
+vendor
+photo.jpg
+my_cover.png
+*Zone.Identifier
+demo_out/
+app_out/
