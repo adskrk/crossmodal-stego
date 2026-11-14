@@ -42,9 +42,10 @@ def main():
     ap.add_argument("--per-cell", type=int, default=20, help="messages per (prompt, C)")
     ap.add_argument("--payload", type=int, default=24, help="bytes per message")
     ap.add_argument("--out", default="results")
-    ap.add_argument("--variant", default="retry", choices=["clear", "filter", "retry"],
+    ap.add_argument("--variant", default="retry", choices=["clear", "filter", "retry", "nlfix"],
                     help="clear: subtext-codec framing as-is (no nonce, filter guard); "
-                         "filter: nonce+whitening, filter guard; retry: nonce+whitening, retry guard")
+                         "filter: nonce+whitening, filter guard; retry: nonce+whitening, retry guard; "
+                         "nlfix: filter + line-break fix (blank-line tokens banned, line breaks shown doubled)")
     ap.add_argument("--cs", default="0,0.02,0.05,0.1")
     args = ap.parse_args()
     CS = [float(c) for c in args.cs.split(",")]
@@ -58,7 +59,8 @@ def main():
     t0 = time.time()
     for C in CS:
         for pi, prompt in enumerate(PROMPTS):
-            cfg = tc.TextConfig(args.model, prompt, C=C, max_new_tokens=3000, guard=guard)
+            cfg = tc.TextConfig(args.model, prompt, C=C, max_new_tokens=3000, guard=guard,
+                                newline_fix=args.variant == "nlfix")
             for j in range(args.per_cell):
                 data = bytes(rng.randrange(256) for _ in range(args.payload))
                 t1 = time.time()

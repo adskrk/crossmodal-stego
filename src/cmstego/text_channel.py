@@ -79,6 +79,19 @@ class TextConfig:
     max_new_tokens: Optional[int] = 2000
     device: str = "cpu"
     guard: str = "filter"  # "filter" (subtext-codec) or "retry" (OD-Stega style; needs a key)
+    # After the hidden bits, keep writing with ordinary sampling until a sentence
+    # ends, so the text does not stop mid-sentence. The decoder stops reading once
+    # it has the payload, so these tokens carry nothing and are ignored. Off by
+    # default so the recorded experiments stay reproducible; system.send turns it on.
+    finish_sentence: bool = False
+    max_tail_tokens: int = 40
+    # Line-break fingerprint fix. Ordinary GPT-2 text often contains the single
+    # token "\n\n" (a blank line); stego-text almost never does, because the
+    # word after it re-reads as "\n", "\n", word and the stability filter
+    # rejects that. With the fix, tokens containing "\n\n" are left out of the
+    # alphabet, every line break of the stego-text is shown doubled, and the
+    # receiver halves them again before decoding. Off by default (experiments).
+    newline_fix: bool = False
 
 
 @dataclasses.dataclass
@@ -92,6 +105,7 @@ class TextStats:
     mean_entropy_bits: float  # mean H(P) of the model at each step
     mean_temperature: float
     attempts: int = 1  # encodes needed (retry guard)
+    tail_tokens: int = 0  # ordinary tokens appended after the payload (finish_sentence)
 
 
 def context_limit(model) -> Optional[int]:
@@ -206,8 +220,41 @@ def od_temperature(p_hat: torch.Tensor, budget: float, iters: int = 50) -> Tuple
     return q, 1.0 / hi
 
 
+_NL_CACHE: dict = {}
+
+
+def _newline_sets(tokenizer):
+    """(tokens containing "\n\n", tokens starting with "\n", tokens ending with "\n"), cached."""
+    key = id(tokenizer)
+    if key not in _NL_CACHE:
+        ids = range(len(tokenizer))
+        pieces = tokenizer.batch_decode([[i] for i in ids])
+        _NL_CACHE[key] = (frozenset(i for i, t in zip(ids, pieces) if "\n\n" in t),
+                          frozenset(i for i, t in zip(ids, pieces) if t.startswith("\n")),
+                          frozenset(i for i, t in zip(ids, pieces) if t.endswith("\n")))
+    return _NL_CACHE[key]
+
+
+def _newline_banned(tokenizer, context_ids: Sequence[int]) -> frozenset:
+    """Tokens that would put a blank line into the stego-text after ``context_ids``.
+
+    Depends only on the context, so encoder and decoder ban the same tokens."""
+    double, starts, ends = _newline_sets(tokenizer)
+    return double | starts if context_ids and context_ids[-1] in ends else double
+
+
+def show_text(text: str, cfg: "TextConfig") -> str:
+    """What the sender publishes: line breaks doubled when ``newline_fix`` is on."""
+    return text.replace("\n", "\n\n") if cfg.newline_fix else text
+
+
+def unshow_text(text: str, cfg: "TextConfig") -> str:
+    """Inverse of :func:`show_text`, applied by the receiver before decoding."""
+    return text.replace("\n\n", "\n") if cfg.newline_fix else text
+
+
 def step_distribution(logits: torch.Tensor, context_ids: Sequence[int], tokenizer, top_k: int, C: float,
-                      guard: str = "filter"):
+                      guard: str = "filter", newline_fix: bool = False):
     """Alphabet, cumulative table, and diagnostics for one generation step."""
     scores = logits.detach().to(torch.float64)
     log_p = torch.log_softmax(scores, dim=0)
@@ -220,6 +267,9 @@ def step_distribution(logits: torch.Tensor, context_ids: Sequence[int], tokenize
     else:
         specials = _special_ids(tokenizer)
         alphabet = [t for t in ranked if t not in specials]
+    if newline_fix:
+        banned = _newline_banned(tokenizer, context_ids)
+        alphabet = [t for t in alphabet if t not in banned]
     if len(alphabet) < MIN_ALPHABET:
         raise ValueError(f"only {len(alphabet)} usable candidates at this step; change the prompt")
 
@@ -265,7 +315,7 @@ def _encode_once(bits: List[int], cfg: TextConfig, model, tokenizer):
         if stagnant >= _STALL_LIMIT:
             raise ValueError("arithmetic coder stopped making progress")
         before = len(mirror.bits)
-        alphabet, cum, diag = step_distribution(stepper.logits, ids, tokenizer, cfg.top_k, cfg.C, cfg.guard)
+        alphabet, cum, diag = step_distribution(stepper.logits, ids, tokenizer, cfg.top_k, cfg.C, cfg.guard, cfg.newline_fix)
         sym = reader.decode(cum)
         mirror.encode(sym, cum)
         token = alphabet[sym]
@@ -281,9 +331,54 @@ def _encode_once(bits: List[int], cfg: TextConfig, model, tokenizer):
         stagnant = 0 if len(mirror.bits) > before else stagnant + 1
     if mirror.bits[:total] != bits:
         raise ValueError("internal error: coder did not reproduce the payload")
+    tail = _finish_sentence(stepper, ids, cfg, tokenizer) if cfg.finish_sentence else 0
     text = tokenizer.decode(ids, skip_special_tokens=True)
-    round_trip = _token_ids(tokenizer, text)[: len(ids)] == ids
-    return text, round_trip, generated, acc
+    round_trip = _token_ids(tokenizer, text)[: len(ids)] == ids and not (cfg.newline_fix and "\n\n" in text)
+    if tail and not round_trip:  # the tail changed how the text re-reads: drop it
+        del ids[len(ids) - tail:]
+        tail = 0
+        text = tokenizer.decode(ids, skip_special_tokens=True)
+        round_trip = _token_ids(tokenizer, text)[: len(ids)] == ids and not (cfg.newline_fix and "\n\n" in text)
+    acc["tail"] = tail
+    return show_text(text, cfg), round_trip, generated, acc
+
+
+_SENTENCE_END = (".", "!", "?", '."', '!"', '?"', ".'", ".)")
+
+
+def _ends_sentence(tokenizer, token: int) -> bool:
+    piece = tokenizer.decode([token])
+    return "\n" in piece or piece.rstrip().endswith(_SENTENCE_END)
+
+
+def _finish_sentence(stepper, ids: List[int], cfg: TextConfig, tokenizer) -> int:
+    """Append ordinary top-k samples until a sentence ends; returns how many.
+
+    Candidates go through the same stability filter as the payload tokens, so
+    the appended words cannot merge with the last hidden token when the
+    receiver re-tokenises the text.
+    """
+    if _ends_sentence(tokenizer, ids[-1]):
+        return 0
+    gen = torch.Generator().manual_seed(int.from_bytes(os.urandom(8), "big") >> 1)
+    added = 0
+    while added < cfg.max_tail_tokens:
+        scores = stepper.logits.detach().to(torch.float64)
+        ranked = torch.argsort(scores.to(torch.float32), descending=True, stable=True)[: cfg.top_k].tolist()
+        cands = _stable_candidates(tokenizer, ids, ranked)
+        if cfg.newline_fix:
+            banned = _newline_banned(tokenizer, ids)
+            cands = [t for t in cands if t not in banned]
+        if not cands:
+            break
+        probs = torch.softmax(scores[torch.tensor(cands)], dim=0)
+        token = cands[int(torch.multinomial(probs, 1, generator=gen))]
+        ids.append(token)
+        stepper.advance(token)
+        added += 1
+        if _ends_sentence(tokenizer, token):
+            break
+    return added
 
 
 def encode(data: bytes, cfg: TextConfig, model, tokenizer, key: Optional[bytes] = None,
@@ -319,6 +414,7 @@ def encode(data: bytes, cfg: TextConfig, model, tokenizer, key: Optional[bytes] 
         mean_entropy_bits=acc["ent"] / LN2 / n,
         mean_temperature=(acc["t"] / acc["nt"]) if acc["nt"] else float("inf"),
         attempts=attempt + 1,
+        tail_tokens=acc.get("tail", 0),
     )
     return text, stats
 
@@ -346,6 +442,7 @@ def decode(text: str, cfg: TextConfig, model, tokenizer, key: Optional[bytes] = 
 
 def decode_with_stats(text: str, cfg: TextConfig, model, tokenizer, key: Optional[bytes] = None):
     """Decode; also return per-token KL diagnostics (vs full P and vs top-k)."""
+    text = unshow_text(text, cfg)
     prompt_ids, body = _body_ids(text, cfg, tokenizer)
     stepper = _Stepper(model, cfg.device, prompt_ids, window=context_limit(model))
     context = list(prompt_ids)
@@ -365,7 +462,7 @@ def decode_with_stats(text: str, cfg: TextConfig, model, tokenizer, key: Optiona
     for token in body:
         if needed is not None and len(writer.bits) >= offset + needed:
             break
-        alphabet, cum, diag = step_distribution(stepper.logits, context, tokenizer, cfg.top_k, cfg.C, cfg.guard)
+        alphabet, cum, diag = step_distribution(stepper.logits, context, tokenizer, cfg.top_k, cfg.C, cfg.guard, cfg.newline_fix)
         if token not in alphabet:
             break
         writer.encode(alphabet.index(token), cum)

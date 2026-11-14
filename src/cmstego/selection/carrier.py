@@ -10,11 +10,17 @@ policy trains in minutes on a CPU. No score is invented. The one modelling
 step is linear interpolation of an image's detector score between measured
 payload rates (0, 0.05, 0.1, 0.2, 0.4 bits per colour value).
 
-Two wardens, so the policy cannot just learn one detector's blind spots:
+Several wardens, so the policy cannot just learn one detector's blind spots.
+Each warden pairs an image detector with a text detector:
   warden A (training reward): SPAM+LR image detector trained on our covers
            (scored out-of-fold by photo) + the n-gram text detector;
   warden B (evaluation only): Aletheia's pretrained EfficientNet-HILL +
-           the white-box likelihood text detector.
+           the white-box likelihood text detector;
+  wardens C, D (only if the style-detector scores exist): EfficientNet-LSBM +
+           style detector, SPA + style detector.
+"ENS" is the worst case over A, C and D: the highest suspicion, flagged if any
+of them flags. It shares no detector with warden B, so B stays unseen when a
+policy is trained against the ensemble.
 
 Split: covers by photo (Kodak 01-16 train, 17-24 test; scikit-image photos are
 a second, unseen source); prompts 0-7 train, 8-11 test.
@@ -42,6 +48,11 @@ IMAGE_OVERHEAD_BYTES = 10 + 8  # fragment header + image frame
 COVER_VALUES = 256 * 256 * 3
 ALPHA = 0.05
 
+IMAGE_DETECTORS = ("spam", "effnet_hill", "effnet_lsbm", "effnet_lsbr", "spa")
+WARDENS = {"A": ("spam", "ngram"), "B": ("effnet_hill", "likelihood"),
+           "C": ("effnet_lsbm", "style"), "D": ("spa", "style")}
+ENSEMBLE = ("A", "C", "D")
+
 
 def photo_group(source: str, cover: str) -> str:
     stem = re.sub(r"_\d+\.png$", "", cover)
@@ -62,25 +73,32 @@ def cover_features(path: str) -> List[float]:
 @dataclasses.dataclass
 class Tables:
     covers: pd.DataFrame  # source, cover, group, split, features
-    img_score: Dict[str, np.ndarray]  # warden -> [n_covers, len(RATES)] HILL detector scores
+    img_score: Dict[str, np.ndarray]  # image detector -> [n_covers, len(RATES)] HILL detector scores
     img_cal: Dict[str, Calibrator]
-    text: pd.DataFrame  # held-out stego-texts: prompt_id, C, score_A, score_B
-    text_cal: Dict[Tuple[str, float], Calibrator]
+    text: pd.DataFrame  # held-out stego-texts: prompt_id, C, score_<text detector>
+    text_cal: Dict[Tuple[str, float], Calibrator]  # (text detector, C)
     prompt_feats: np.ndarray  # [n_prompts, 2]: mean entropy (bits), mean tokens at C=0 (scaled)
 
     def image_feasible(self, ci: int, rate: float) -> bool:
         return rate * COVER_VALUES <= self.covers["capacity_bits"].iloc[ci]
 
+    @property
+    def wardens(self) -> Tuple[str, ...]:
+        """Wardens whose detectors were all measured."""
+        return tuple(w for w, (i, t) in WARDENS.items() if i in self.img_score and f"score_{t}" in self.text)
+
     def image_p(self, w: str, ci: int, rate: float) -> float:
-        row = self.img_score[w][ci]
+        det = WARDENS[w][0]
+        row = self.img_score[det][ci]
         ok = np.isfinite(row)
         # Interpolate between measured rates; beyond the last measured (but feasible)
         # rate, hold the last value — an optimistic approximation, flagged in RESULTS.md.
         s = float(np.interp(rate, RATES[ok], row[ok]))
-        return float(self.img_cal[w].p_value(s)[0])
+        return float(self.img_cal[det].p_value(s)[0])
 
     def text_p(self, w: str, row: pd.Series) -> float:
-        return float(self.text_cal[(w, row["C"])].p_value(row[f"score_{w}"])[0])
+        det = WARDENS[w][1]
+        return float(self.text_cal[(det, row["C"])].p_value(row[f"score_{det}"])[0])
 
 
 def build_tables(results_dir: str, covers_dir: str, text_tag: str = "text_retry_") -> Tables:
@@ -96,9 +114,8 @@ def build_tables(results_dir: str, covers_dir: str, text_tag: str = "text_retry_
     sub = img[keep].reset_index(drop=True)
     y = (sub["method"] == "hill").astype(int).values
     clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=5000, C=0.1))
-    sub["score_A"] = cross_val_predict(clf, spam[keep], y, groups=sub["group"], cv=GroupKFold(5),
-                                       method="predict_proba")[:, 1]
-    sub["score_B"] = sub["effnet_hill"]
+    sub["spam"] = cross_val_predict(clf, spam[keep], y, groups=sub["group"], cv=GroupKFold(5),
+                                    method="predict_proba")[:, 1]
 
     covers = sub[sub["method"] == "none"][["source", "cover", "group"]].reset_index(drop=True)
     covers[["log_texture", "mean", "std", "saturated"]] = np.asarray(
@@ -119,27 +136,31 @@ def build_tables(results_dir: str, covers_dir: str, text_tag: str = "text_retry_
 
     img_score, img_cal = {}, {}
     idx = sub.set_index(["source", "cover", "rate"])
-    for w in ("A", "B"):
+    for det in IMAGE_DETECTORS:
+        if det not in sub:
+            continue
         t = np.full((len(covers), len(RATES)), np.nan)  # NaN = rate was over this cover's capacity
         for i, (s, c) in enumerate(zip(covers["source"], covers["cover"])):
             for j, r in enumerate(RATES):
                 if (s, c, r) in idx.index:
-                    t[i, j] = float(idx.loc[(s, c, r), f"score_{w}"])
-        img_score[w] = t
-        img_cal[w] = Calibrator.fit(t[:, 0])
+                    t[i, j] = float(idx.loc[(s, c, r), det])
+        img_score[det] = t
+        img_cal[det] = Calibrator.fit(t[:, 0])
 
     held = pd.read_csv(os.path.join(results_dir, text_tag + "heldout_scores.csv"))
+    extra = os.path.join(results_dir, text_tag + "heldout_scores_style.csv")
+    if os.path.exists(extra):  # third text detector, from scripts/add_style_detector.py
+        held = pd.concat([held, pd.read_csv(extra)], ignore_index=True)
     global C_VALUES
     C_VALUES[:] = sorted(float(c) for c in held["C"].unique())  # the budgets actually measured
     pid = {p: i for i, p in enumerate(PROMPTS)}
     held["prompt_id"] = held["prompt"].map(pid)
-    a = held[held["detector"] == "ngram"].set_index(["C", "prompt_id", "j"])
-    b = held[held["detector"] == "likelihood"].set_index(["C", "prompt_id", "j"])
-    text = pd.DataFrame({"score_A": a["stego_score"], "score_B": b["stego_score"]}).reset_index()
+    by_det = {d: g.set_index(["C", "prompt_id", "j"]) for d, g in held.groupby("detector")}
+    text = pd.DataFrame({f"score_{d}": g["stego_score"] for d, g in by_det.items()}).reset_index()
     text_cal = {}
-    for C in C_VALUES:
-        text_cal[("A", C)] = Calibrator.fit(a.loc[C]["cover_score"].values)
-        text_cal[("B", C)] = Calibrator.fit(b.loc[C]["cover_score"].values)
+    for d, g in by_det.items():
+        for C in C_VALUES:
+            text_cal[(d, C)] = Calibrator.fit(g.loc[C]["cover_score"].values)
 
     meas = pd.read_csv(os.path.join(results_dir, text_tag + "measurements.csv"))
     m0 = meas[meas["C"] == 0].groupby("prompt_id")[["mean_entropy_bits", "tokens"]].mean()
@@ -180,7 +201,13 @@ def image_rate(L: int) -> float:
 
 
 def evaluate(T: Tables, ep: Episode, k: int, m: int, c: int, w: str) -> Tuple[float, bool]:
-    """Pooled suspicion (1 - min p) and whether warden w flags the pair."""
+    """Pooled suspicion (1 - min p) and whether warden w flags the pair.
+
+    ``w = "ENS"``: the worst case over the ensemble wardens (highest suspicion;
+    flagged if any one flags)."""
+    if w == "ENS":
+        res = [evaluate(T, ep, k, m, c, v) for v in ENSEMBLE]
+        return max(r[0] for r in res), any(r[1] for r in res)
     C = C_VALUES[c]
     row = T.text.iloc[ep.text_pick[(int(ep.prompts[m]), C)]]
     pt = T.text_p(w, row)

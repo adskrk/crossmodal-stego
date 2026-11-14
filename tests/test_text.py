@@ -131,3 +131,12 @@ def test_od_temperature_hits_budget():
         hq = float(-(q * q.log()).sum())
         hp = float(-(p * p.log()).sum())
         assert hq >= hp - 1e-12
+
+
+def test_style_detector_separates_obvious_styles():
+    from cmstego.detectors.text_det import StyleDetector
+    a = [f"Short words here. Then more {i}. And so on." for i in range(20)]
+    b = [f"Considerably lengthier vocabulary, demonstrating sophisticated characteristics {i}\n\n" for i in range(20)]
+    det = StyleDetector().fit(a[:10] + b[:10], [0] * 10 + [1] * 10)
+    s = det.score(a[10:] + b[10:])
+    assert s[10:].min() > s[:10].max()

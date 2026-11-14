@@ -14,6 +14,11 @@ output distribution, not whether a small model writes like a human.
   and feeds them to logistic regression. Raising the OD budget C flattens the
   distribution, so stego tokens become less probable — this detector is
   designed to catch exactly that.
+* ``StyleDetector`` — a black-box warden of a different family: hand-made
+  writing-style statistics (word and sentence lengths, vocabulary richness,
+  punctuation, repetition) + logistic regression. Needs no language model, so
+  it can be computed from saved texts. Used as a third text eye so that a
+  selection policy can be trained against some detectors and tested on others.
 """
 
 from __future__ import annotations
@@ -82,3 +87,46 @@ class LikelihoodDetector:
 
     def score(self, texts) -> np.ndarray:
         return self.clf.predict_proba(self._feats(texts))[:, 1]
+
+
+_STOP = frozenset("the a an and or of to in on for with is are was were be been it this that as at by from "
+                  "you we they he she i not but if so can will".split())
+
+
+def style_features(text: str) -> List[float]:
+    import re
+
+    words = re.findall(r"[A-Za-z']+", text)
+    n = max(len(words), 1)
+    lens = np.array([len(w) for w in words]) if words else np.zeros(1)
+    lower = [w.lower() for w in words]
+    uniq = set(lower)
+    counts = {}
+    for w in lower:
+        counts[w] = counts.get(w, 0) + 1
+    hapax = sum(1 for c in counts.values() if c == 1)
+    sents = [x for x in re.split(r"[.!?]+", text) if x.strip()]
+    slens = np.array([len(re.findall(r"[A-Za-z']+", x)) for x in sents]) if sents else np.zeros(1)
+    bigrams = list(zip(lower, lower[1:]))
+    rep_bigrams = 1 - len(set(bigrams)) / max(len(bigrams), 1)
+    chars = max(len(text), 1)
+    return [
+        np.log(n), lens.mean(), lens.std(), len(uniq) / n, hapax / n,
+        sum(ch in ",;:" for ch in text) / chars, sum(ch in ".!?" for ch in text) / chars,
+        text.count("\n") / chars, sum(ch.isdigit() for ch in text) / chars,
+        sum(w[0].isupper() for w in words) / n, slens.mean(), slens.std(),
+        sum(ord(ch) > 127 for ch in text) / chars, sum(ch in "\"'()" for ch in text) / chars,
+        sum(w in _STOP for w in lower) / n, rep_bigrams,
+    ]
+
+
+class StyleDetector:
+    def __init__(self):
+        self.pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=5000, C=0.5))
+
+    def fit(self, texts: Sequence[str], labels: Sequence[int]):
+        self.pipe.fit(np.array([style_features(t) for t in texts]), list(labels))
+        return self
+
+    def score(self, texts: Sequence[str]) -> np.ndarray:
+        return self.pipe.predict_proba(np.array([style_features(t) for t in texts]))[:, 1]

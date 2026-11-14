@@ -58,6 +58,23 @@ def fmt_ci(a, lo, hi):
     return f"{a:.2f} [{lo:.2f}, {hi:.2f}]"
 
 
+def operating_points(neg, pos):
+    """P_E and detection rate at a 5% false-alarm rate (higher score = more suspicious).
+
+    P_E = min over thresholds of (P_FA + P_MD) / 2, the usual steganalysis error:
+    0.5 = the detector is guessing, 0 = perfect. TPR@5%FPR = share of stego caught
+    when the threshold lets through at most 5% of clean items as false alarms.
+    """
+    neg, pos = np.sort(np.asarray(neg, float)), np.asarray(pos, float)
+    thr = np.unique(np.r_[neg, pos, np.inf])
+    p_fa = np.array([(neg >= t).mean() for t in thr])
+    p_md = np.array([(pos < t).mean() for t in thr])
+    pe = float(np.min((p_fa + p_md) / 2))
+    t5 = np.quantile(neg, 0.95, method="higher")
+    tpr5 = float((pos > t5).mean())
+    return pe, tpr5
+
+
 def image_section(lines):
     img = pd.read_csv(os.path.join(R, "image_measurements.csv"))
     ref = pd.read_csv(os.path.join(R, "image_measurements_refused.csv"))
@@ -131,6 +148,28 @@ def image_section(lines):
             cells = [fmt_ci(g.loc[r, "auc"], g.loc[r, "lo"], g.loc[r, "hi"]) if r in g.index else "—" for r in (0.05, 0.1, 0.2, 0.4)]
             lines.append(f"| {det} | {METHOD_NAME[m]} | " + " | ".join(cells) + " |")
     lines.append("")
+    op_rows = []
+    for det, col in [("SPA", "spa"), ("EfficientNet-HILL", "effnet_hill")]:
+        for src in ("A_kodak", "B_skimage"):
+            for m in ("lsbr", "hill"):
+                for rate in (0.05, 0.1, 0.2):
+                    sv = st[(st.method == m) & np.isclose(st.rate, rate) & (st.source == src)][col]
+                    cv = clean[clean.source == src][col]
+                    if len(sv) >= 5:
+                        pe, tpr5 = operating_points(cv, sv)
+                        op_rows.append({"detector": det, "source": src, "method": m, "rate": rate, "pe": pe, "tpr5": tpr5})
+    op = pd.DataFrame(op_rows)
+    op.to_csv(os.path.join(R, "image_operating_points.csv"), index=False)
+    lines += ["**Operating points.** P_E = lowest achievable average error (0.5 = guessing). "
+              "Caught @5% FA = share of stego images caught when at most 5% of clean images are falsely flagged.", "",
+              "| Detector | Source | Method | P_E (0.05 / 0.1 / 0.2) | Caught @5% FA (0.05 / 0.1 / 0.2) |",
+              "| --- | --- | --- | --- | --- |"]
+    for (det, src, m), g in op.groupby(["detector", "source", "method"], sort=False):
+        g = g.set_index("rate")
+        pes = " / ".join(f"{g.loc[r, 'pe']:.2f}" if r in g.index else "—" for r in (0.05, 0.1, 0.2))
+        tprs = " / ".join(f"{100 * g.loc[r, 'tpr5']:.0f}%" if r in g.index else "—" for r in (0.05, 0.1, 0.2))
+        lines.append(f"| {det} | {'Kodak' if src == 'A_kodak' else 'scikit-image'} | {METHOD_NAME[m]} | {pes} | {tprs} |")
+    lines.append("")
     # Warden A's image eye: SPAM + logistic regression, out-of-fold by photo (same as selection/carrier.py).
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import GroupKFold, cross_val_predict
@@ -165,32 +204,42 @@ def image_section(lines):
 
 VARIANTS = [("clear", "subtext-codec framing as-is (length field in clear), filter guard"),
             ("filter", "+ nonce and whitening, filter guard (final system)"),
-            ("retry", "+ nonce and whitening, retry guard (OD-Stega style)")]
+            ("retry", "+ nonce and whitening, retry guard (OD-Stega style)"),
+            ("nlfix", "filter + line-break fix (blank-line tokens banned, line breaks shown doubled)")]
 
 
-def text_section(lines):
-    lines += ["## 2. Text channel", "",
-              "Three variants of the text coder were run on the same 12 prompts with 24-byte random payloads. "
+def text_section(lines, rdir=R, title="## 2. Text channel", fig_name="text_detectability.png", timing_note=True):
+    present = [v for v, _ in VARIANTS if os.path.exists(os.path.join(rdir, f"text_{v}_measurements.csv"))]
+    lines += [title, "",
+              f"{len(present)} variant(s) of the text coder were run on the same 12 prompts with 24-byte random payloads. "
               "Covers are ordinary top-64 samples from the same model, cut to the same token count.", ""]
     meas_rows, auc_rows = [], []
     for v, desc in VARIANTS:
-        mp = os.path.join(R, f"text_{v}_measurements.csv")
+        mp = os.path.join(rdir, f"text_{v}_measurements.csv")
         if not os.path.exists(mp):
             continue
         m = pd.read_csv(mp)
-        held = pd.read_csv(os.path.join(R, f"text_{v}_heldout_scores.csv"))
+        held = pd.read_csv(os.path.join(rdir, f"text_{v}_heldout_scores.csv"))
+        sp = os.path.join(rdir, f"text_{v}_heldout_scores_style.csv")
+        if os.path.exists(sp):
+            held = pd.concat([held, pd.read_csv(sp)], ignore_index=True)
         for C, g in m.groupby("C"):
             row = {"variant": v, "desc": desc, "C": C, "n": len(g), "rec": g.recovered.sum(),
                    "bpt": g.bits_per_token.mean(), "kl": g.kl_bits_per_token.mean(),
                    "klc": g["kl_vs_topk_bits_per_token"].mean() if "kl_vs_topk_bits_per_token" in g else np.nan,
                    "att": g["attempts"].mean() if "attempts" in g else 1.0,
                    "enc": g.encode_s.median(), "dec": g.decode_s.median()}
-            for det in ("ngram", "likelihood"):
+            for det in ("ngram", "likelihood", "style"):
                 h = held[(held.C == C) & (held.detector == det)]
+                if h.empty:
+                    continue
                 a, lo, hi = auc_ci(h.cover_score, h.stego_score)
+                pe, tpr5 = operating_points(h.cover_score, h.stego_score)
                 row[det] = (a, lo, hi)
+                row[det + "_op"] = (pe, tpr5)
                 row["pairs"] = len(h)
-                auc_rows.append({"variant": v, "C": C, "detector": det, "auc": a, "lo": lo, "hi": hi})
+                auc_rows.append({"variant": v, "C": C, "detector": det, "auc": a, "lo": lo, "hi": hi,
+                                 "pe": pe, "tpr5": tpr5})
             meas_rows.append(row)
     if not meas_rows:
         return
@@ -198,15 +247,19 @@ def text_section(lines):
     rec = sum(r["rec"] for r in meas_rows)
     fails = 0
     for v, _ in VARIANTS:
-        fp = os.path.join(R, f"text_{v}_encode_failures.csv")
+        fp = os.path.join(rdir, f"text_{v}_encode_failures.csv")
         if os.path.exists(fp):
             fails += len(pd.read_csv(fp))
     lines.append(f"**Exact recovery: {rec} / {tot} stego-texts ({100*rec/tot:.1f}%) across all variants.** "
-                 f"{fails} further messages could not be encoded at all (retry guard: no clean re-tokenisation in 64 attempts); "
-                 "they were reported as failures, never sent.")
+                 + (f"{fails} further messages could not be encoded at all; they were reported as failures, never sent."
+                    if fails else "No message failed to encode."))
     lines.append("")
-    lines.append("*Timings were measured while several experiments shared a 2-core machine; the filter C = 0.1 and "
-                 "retry runs overlapped with others and are not comparable speed measurements. Re-measure on your laptop.*")
+    if timing_note:
+        lines.append("*Timings were measured while several experiments shared a 2-core machine; the filter C = 0.1 and "
+                     "retry runs overlapped with others and are not comparable speed measurements.*")
+    else:
+        lines.append("*Timings: one experiment at a time on a laptop CPU (no GPU); encode includes the per-step "
+                     "tokenisation filter, decode is a single pass.*")
     lines.append("")
     lines += ["| Variant | C | n | Payload bits / token | KL vs full model (bits/token) | KL vs top-k sampling (bits/token) | Encodes per message | Encode s (median) | Decode s (median) |",
               "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
@@ -214,17 +267,50 @@ def text_section(lines):
         klc = "—" if np.isnan(r["klc"]) else f"{r['klc']:.4f}"
         lines.append(f"| {r['variant']} | {r['C']:g} | {r['n']} | {r['bpt']:.2f} | {r['kl']:.4f} | {klc} | {r['att']:.1f} | {r['enc']:.2f} | {r['dec']:.2f} |")
     lines.append("")
+    has_style = any("style" in r for r in meas_rows)
+    dets = [("ngram", "N-gram detector (black box)"), ("likelihood", "Likelihood detector (white box)")]
+    if has_style:
+        dets.append(("style", "Style detector (black box)"))
     lines += ["### Detectability (held-out ROC-AUC; 0.5 = chance)", "",
-              "| Variant | C | N-gram detector (black box) | Likelihood detector (white box) | Test pairs |",
-              "| --- | --- | --- | --- | --- |"]
+              "| Variant | C | " + " | ".join(d[1] for d in dets) + " | Test pairs |",
+              "| --- | --- | " + " | ".join("---" for _ in dets) + " | --- |"]
     for r in meas_rows:
-        lines.append(f"| {r['variant']} | {r['C']:g} | {fmt_ci(*r['ngram'])} | {fmt_ci(*r['likelihood'])} | {r['pairs']} |")
+        cells = [fmt_ci(*r[d]) if d in r else "—" for d, _ in dets]
+        lines.append(f"| {r['variant']} | {r['C']:g} | " + " | ".join(cells) + f" | {r['pairs']} |")
     lines.append("")
+    lines += ["| Variant | C | " + " | ".join(f"{d[1].split(' (')[0]}: P_E / caught @5% FA" for d in dets) + " |",
+              "| --- | --- | " + " | ".join("---" for _ in dets) + " |"]
+    for r in meas_rows:
+        cells = [f"{r[d + '_op'][0]:.2f} / {100 * r[d + '_op'][1]:.0f}%" if d + "_op" in r else "—" for d, _ in dets]
+        lines.append(f"| {r['variant']} | {r['C']:g} | " + " | ".join(cells) + " |")
+    lines.append("")
+    if has_style:
+        lines += ["The style detector (word and sentence lengths, vocabulary richness, punctuation, line breaks; "
+                  "no language model) was added later and scored on the same saved texts with the same "
+                  "train/test split (`scripts/add_style_detector.py`).", ""]
+    # Blank lines: the visible form of the tokenisation fingerprint (computed from the saved texts).
+    bl_rows = []
+    for v, _ in VARIANTS:
+        sp = os.path.join(rdir, f"text_{v}_samples.jsonl")
+        if not os.path.exists(sp):
+            continue
+        with open(sp, encoding="utf-8") as fh:
+            smp = [json.loads(line) for line in fh]
+        for C in sorted({x["C"] for x in smp}):
+            cell = [x for x in smp if x["C"] == C]
+            bl_rows.append((v, C, len(cell), sum("\n\n" in x["cover"] for x in cell), sum("\n\n" in x["stego"] for x in cell)))
+    if bl_rows:
+        lines += ["**Blank lines.** Share of texts containing at least one blank line (two line breaks in a row):", "",
+                  "| Variant | C | Ordinary texts | Stego-texts |", "| --- | --- | --- | --- |"]
+        for v, C, n, bc, bs in bl_rows:
+            lines.append(f"| {v} | {C:g} | {bc}/{n} ({100*bc/n:.0f}%) | {bs}/{n} ({100*bs/n:.0f}%) |")
+        lines.append("")
+    pd.DataFrame(auc_rows).to_csv(os.path.join(rdir, "text_metrics.csv"), index=False)
     lines += ["Variants: " + "; ".join(f"**{v}** = {d}" for v, d in VARIANTS) + ".", ""]
 
     a = pd.DataFrame(auc_rows)
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.3), sharey=True, facecolor=SURF)
-    colors = {"clear": ORANGE, "filter": AQUA, "retry": BLUE}
+    colors = {"clear": ORANGE, "filter": AQUA, "retry": BLUE, "nlfix": "#8a5cd1"}
     for ax, det, title in ((axes[0], "ngram", "N-gram detector (black box)"), (axes[1], "likelihood", "Likelihood detector (white box)")):
         vs = [v for v, _ in VARIANTS if v in set(a.variant)]
         Cs = sorted(a.C.unique())
@@ -240,18 +326,19 @@ def text_section(lines):
         style(ax, title, None, "held-out ROC-AUC" if det == "ngram" else None)
     handles, labels = axes[0].get_legend_handles_labels()
     short = {"clear": "clear (length field unscrambled)", "filter": "filter (+ nonce, filter guard)",
-             "retry": "retry (+ nonce, retry guard)"}
+             "retry": "retry (+ nonce, retry guard)", "nlfix": "nlfix (+ line-break fix)"}
     fig.legend(handles, [short[l] for l in labels],
-               loc="upper center", ncol=3, frameon=False, fontsize=8, bbox_to_anchor=(0.5, 1.0))
+               loc="upper center", ncol=4, frameon=False, fontsize=8, bbox_to_anchor=(0.5, 1.0))
     fig.tight_layout(rect=(0, 0, 1, 0.9))
-    fig.savefig(os.path.join(FIG, "text_detectability.png"), dpi=160)
+    fig.savefig(os.path.join(FIG, fig_name), dpi=160)
     plt.close(fig)
-    lines += ["![Text detectability by variant](figures/text_detectability.png)", ""]
-    fp = os.path.join(R, "text_fingerprint.csv")
+    lines += [f"![Text detectability by variant](figures/{fig_name})", ""]
+    fp = os.path.join(rdir, "text_fingerprint.csv")
     if os.path.exists(fp):
         f = pd.read_csv(fp)
-        top = f.iloc[:-1].sort_values("single_feature_auc", ascending=False).iloc[0]
-        cnt = f.iloc[-1]
+        counts = f[f.feature.str.startswith("texts with")].set_index("feature")
+        top = f[~f.feature.str.startswith("texts with")].sort_values("single_feature_auc", ascending=False).iloc[0]
+        cnt = counts.loc["texts with >=1 token outside top-k"]
         lines += ["### What the white-box detector sees at C = 0 (filter variant)", "",
                   f"The single most informative feature is *{top.feature}* (single-feature AUC {top.single_feature_auc:.2f}, "
                   "close to the full detector). When the text is re-read by the tokenizer, "
@@ -259,12 +346,29 @@ def text_section(lines):
                   f"versus {int(cnt.stego_mean)} of {int(cnt.single_feature_auc)} stego-texts. Ordinary sampling sometimes picks token pairs "
                   "that merge into a different tokenisation; exact-decoding stego-text never can, under either guard. "
                   "This is why the retry guard did not lower detectability.", ""]
+        if "texts with a blank line" in counts.index:
+            bl = counts.loc["texts with a blank line"]
+            lines += [f"Texts with a blank line in this run: {int(bl.cover_mean)} of {int(bl.single_feature_auc)} ordinary, "
+                      f"{int(bl.stego_mean)} of {int(bl.single_feature_auc)} stego.", ""]
+    fn = os.path.join(rdir, "text_fingerprint_nlfix.csv")
+    if os.path.exists(fn):
+        f2 = pd.read_csv(fn).set_index("feature")
+        c2 = f2.loc["texts with >=1 token outside top-k"]
+        lines += ["**With the line-break fix (nlfix, C = 0):** texts with at least one token outside the top 64 when "
+                  f"re-read: {int(c2.cover_mean)} of {int(c2.single_feature_auc)} ordinary vs {int(c2.stego_mean)} of "
+                  f"{int(c2.single_feature_auc)} stego. Single-feature AUC of the share of such tokens: "
+                  f"{f2.loc['share of tokens outside top-k', 'single_feature_auc']:.2f}.", ""]
 
 
-def selection_section(lines):
-    s = json.load(open(os.path.join(R, "selection_summary.json"), encoding="utf-8"))
+NAMES = {"none": "No selection", "random": "Random", "heuristic": "Heuristic", "grid-A": "Grid search (vs A)",
+         "ppo": "PPO v1 (slot-index policy)", "ppo-score": "PPO v2 (scoring policy)",
+         "grid-ens": "Grid search (vs ensemble)", "ppo-ens": "PPO (scoring policy, vs ensemble)"}
+
+
+def selection_section(lines, rdir=R, title="## 3. Carrier selection with a pooled warden", fig_name="selection.png"):
+    s = json.load(open(os.path.join(rdir, "selection_summary.json"), encoding="utf-8"))
     df = pd.DataFrame(s["summary"])
-    lines += ["## 3. Carrier selection with a pooled warden", ""]
+    lines += [title, ""]
     lines.append(f"Text measurements from the `{s.get('text_variant','text_filter_').strip('_').replace('text_','')}` variant (C ∈ {s['C_values']}). "
                  f"{s['episodes_per_split']} held-out messages per test set; each has K = {s['K_covers']} candidate "
                  f"photos and M = {s['M_prompts']} candidate prompts, message sizes {s['message_bytes']} bytes. "
@@ -272,21 +376,20 @@ def selection_section(lines):
                  "Lower is better for the sender. Flag rate = share of pairs the warden flags at a 5% false-alarm rate; "
                  "a failed send (photo too small for the payload) counts as flagged.")
     lines.append("")
-    names = {"none": "No selection", "random": "Random", "heuristic": "Heuristic", "grid-A": "Grid search (vs A)",
-             "ppo": "PPO v1 (slot-index policy)", "ppo-score": "PPO v2 (scoring policy)"}
+    names = NAMES
+    order = [o for o in NAMES if o in set(df.strategy)]
     for split, label in (("test", "Unseen Kodak photos + unseen prompts"), ("test_B", "Unseen image source (scikit-image) + unseen prompts")):
         lines += [f"### {label}", "",
                   "| Strategy | Carriers evaluated / message | Suspicion, warden A | Flag rate, warden A | Suspicion, warden B (never trained on) | Flag rate, warden B |",
                   "| --- | --- | --- | --- | --- | --- |"]
-        for st in ("none", "random", "heuristic", "grid-A", "ppo", "ppo-score"):
+        for st in order:
             a = df[(df.split == split) & (df.strategy == st) & (df.warden == "A")].iloc[0]
             b = df[(df.split == split) & (df.strategy == st) & (df.warden == "B")].iloc[0]
             lines.append(f"| {names[st]} | {a.evaluations_per_message:.0f} | {fmt_ci(a.mean_suspicion, *a.susp_ci)} | "
                          f"{fmt_ci(a.flag_rate, *a.flag_ci)} | {fmt_ci(b.mean_suspicion, *b.susp_ci)} | {fmt_ci(b.flag_rate, *b.flag_ci)} |")
         lines.append("")
 
-    fig, axes = plt.subplots(1, 2, figsize=(9, 3.6), sharey=True, facecolor=SURF)
-    order = ["none", "random", "heuristic", "grid-A", "ppo", "ppo-score"]
+    fig, axes = plt.subplots(1, 2, figsize=(9, 0.5 * len(order) + 0.6), sharey=True, facecolor=SURF)
     for ax, w in zip(axes, ("A", "B")):
         g = df[(df.split == "test") & (df.warden == w)].set_index("strategy").loc[order]
         y = np.arange(len(order))[::-1]  # first strategy at the top
@@ -301,23 +404,97 @@ def selection_section(lines):
         ax.grid(axis="y", visible=False)
         ax.grid(axis="x", color=GRID, linewidth=0.8)
     fig.tight_layout()
-    fig.savefig(os.path.join(FIG, "selection.png"), dpi=160)
+    fig.savefig(os.path.join(FIG, fig_name), dpi=160)
     plt.close(fig)
-    lines += ["![Carrier selection](figures/selection.png)", ""]
+    lines += [f"![Carrier selection](figures/{fig_name})", ""]
+
+
+DET_NAMES = {"spam": "SPAM+LR", "effnet_hill": "EfficientNet-HILL", "effnet_lsbm": "EfficientNet-LSBM",
+             "effnet_lsbr": "EfficientNet-LSBR", "spa": "SPA", "ngram": "n-gram", "likelihood": "likelihood",
+             "style": "style"}
+
+
+def ensemble_section(lines, rdir):
+    s = json.load(open(os.path.join(rdir, "selection_ensemble_summary.json"), encoding="utf-8"))
+    df = pd.DataFrame(s["summary"])
+    w = s["wardens"]
+    lines += ["## 4. Training against several wardens (GPT-2 text measurements)", "",
+              "Overfitting to one warden was the main weakness found in section 3, so the same selection problem was "
+              "repeated with an **ensemble** of wardens during training: "
+              + "; ".join(f"{k} = {DET_NAMES[a]} (image) + {DET_NAMES[b]} (text)" for k, (a, b) in w.items()) +
+              f". The ensemble (ENS) is the worst case over {', '.join(s['ensemble'])}: the highest suspicion, flagged if "
+              "any one flags. It shares no detector with warden B, which is never used in training. PPO here is the "
+              f"scoring policy, {s['ppo_steps']:,} steps. Baselines are recomputed in this run; PPO policies are retrained.", ""]
+    order = [o for o in ("none", "heuristic", "random", "grid-A", "grid-ens", "ppo-score", "ppo-ens", "ppo") if o in set(df.strategy)]
+    names = dict(NAMES)
+    names["ppo-score"] = "PPO (scoring policy, vs A)"
+    for split, label in (("test", "Unseen Kodak photos + unseen prompts"), ("test_B", "Unseen image source + unseen prompts")):
+        lines += [f"### {label}", "", "| Strategy | Flag rate, A | Flag rate, ENS (training ensemble) | Flag rate, B (never trained on) | Suspicion, B |",
+                  "| --- | --- | --- | --- | --- |"]
+        for st in order:
+            r = {ww: df[(df.split == split) & (df.strategy == st) & (df.warden == ww)].iloc[0] for ww in ("A", "ENS", "B")}
+            lines.append(f"| {names.get(st, st)} | {fmt_ci(r['A'].flag_rate, *r['A'].flag_ci)} | "
+                         f"{fmt_ci(r['ENS'].flag_rate, *r['ENS'].flag_ci)} | {fmt_ci(r['B'].flag_rate, *r['B'].flag_ci)} | "
+                         f"{fmt_ci(r['B'].mean_suspicion, *r['B'].susp_ci)} |")
+        lines.append("")
+
+
+def split_section(lines, rdir):
+    s = json.load(open(os.path.join(rdir, "split_summary.json"), encoding="utf-8"))
+    df = pd.DataFrame(s["summary"])
+    toks = ", ".join(f"{k} bytes ≈ {v:.0f} tokens" for k, v in s["mean_tokens"].items())
+    lines += ["## 5. Choosing the split (lock-box package between text and image)", "",
+              f"Text fragment sizes measured on GPT-2 at C = 0: {toks}. Secrets of {s['message_bytes']} bytes, "
+              f"{s['episodes_per_split']} held-out messages per test set. Each strategy picks a cover, a prompt and a text size; "
+              "the image carries the rest of the package.", ""]
+    names = {"min-text": "Smallest text share", "max-text": "Largest text share", "random": "Random",
+             "grid-A": "Grid search (vs A)", "grid-ens": "Grid search (vs ensemble)", "ppo-A": "PPO (vs A)",
+             "ppo-ens": "PPO (vs ensemble)"}
+    ws = [w for w in ("A", "ENS", "B") if w in s["wardens"]]
+    for split, label in (("test", "Unseen Kodak photos + unseen prompts"), ("test_B", "Unseen image source + unseen prompts")):
+        lines += [f"### {label}", "", "| Strategy | " + " | ".join(f"Flag rate, {w}" for w in ws) + " | Text sizes chosen |",
+                  "| --- | " + " | ".join("---" for _ in ws) + " | --- |"]
+        for st in [n for n in names if n in set(df.strategy)]:
+            g = df[(df.split == split) & (df.strategy == st)].set_index("warden")
+            share = g.iloc[0]["size_share"]
+            share_txt = ", ".join(f"{k} B: {100*v:.0f}%" for k, v in sorted(share.items(), key=lambda kv: int(kv[0])))
+            lines.append(f"| {names[st]} | " + " | ".join(fmt_ci(g.loc[w, 'flag_rate'], *g.loc[w, 'flag_ci']) for w in ws)
+                         + f" | {share_txt} |")
+        lines.append("")
+
+
+G = "results_gpt2"
 
 
 def main():
     os.makedirs(FIG, exist_ok=True)
+    has_gpt2 = os.path.exists(os.path.join(G, "text_filter_measurements.csv"))
     lines = ["# First-stage results", "",
-             "Generated by `scripts/make_report.py` from the files in `results/`. Every number below is measured "
-             "by this repository's code; nothing is quoted from papers. Sample sizes are small.", "",
-             "**Language model used for these numbers:** a 4-layer offline toy GPT-2 (`data/toy-lm`, built by "
-             "`scripts/make_toy_lm.py`), because the build machine could not reach Hugging Face. Text-channel "
-             "numbers will differ with GPT-2; re-run `exp_text.py --model gpt2` to replace them.", ""]
+             "Generated by `scripts/make_report.py` from the files in `results/` and `results_gpt2/`. Every number "
+             "below is measured by this repository's code; nothing is quoted from papers. Sample sizes are small.", ""]
+    if has_gpt2:
+        lines += ["**Language models.** Text results come from two runs: **GPT-2** (124M, the model the system uses; "
+                  "`results_gpt2/`, run on a laptop CPU) and an earlier run with a 4-layer offline **toy model** "
+                  "(`data/toy-lm`; `results/`), which covers more variants and budgets. Where they overlap they agree "
+                  "in direction; the GPT-2 numbers are the ones to quote.", ""]
     image_section(lines)
-    text_section(lines)
-    if os.path.exists(os.path.join(R, "selection_summary.json")):
+    if has_gpt2:
+        text_section(lines, G, "## 2. Text channel (GPT-2)", "text_detectability_gpt2.png", timing_note=False)
+        text_section(lines, R, "## 2b. Text channel (toy model, more variants)", "text_detectability.png")
+    else:
+        text_section(lines)
+    if has_gpt2 and os.path.exists(os.path.join(G, "selection_summary.json")):
+        selection_section(lines, G, "## 3. Carrier selection with a pooled warden (GPT-2 text measurements)",
+                          "selection_gpt2.png")
+        if os.path.exists(os.path.join(R, "selection_summary.json")):
+            selection_section(lines, R, "## 3b. Carrier selection (toy-model text measurements, earlier run)",
+                              "selection.png")
+    elif os.path.exists(os.path.join(R, "selection_summary.json")):
         selection_section(lines)
+    if os.path.exists(os.path.join(G, "selection_ensemble_summary.json")):
+        ensemble_section(lines, G)
+    if os.path.exists(os.path.join(G, "split_summary.json")):
+        split_section(lines, G)
     open(os.path.join(D, "RESULTS.md"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print("wrote docs/RESULTS.md")
 

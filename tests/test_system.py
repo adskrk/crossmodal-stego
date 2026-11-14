@@ -132,3 +132,40 @@ def test_one_carrier_alone_is_not_enough(lm):
         assert aont.unpack(fake) != secret
     except ValueError:
         pass
+
+
+@pytest.mark.parametrize("seed_prompt", [0, 4, 7])
+def test_text_finishes_its_sentence(lm, seed_prompt):
+    model, tok = lm
+    secret = b"finish the sentence please"
+    cfg = system.SendConfig(key=b"k", model_path=DEFAULT_LM, prompt=PROMPTS[seed_prompt], image_method="lsbm")
+    car = system.send(secret, cover(), cfg, model, tok, msg_id=13)
+    tail = car.text_stats.tail_tokens
+    assert 0 <= tail <= 40
+    if 0 < tail < 40:  # stopped because a sentence (or line) ended
+        assert car.text.rstrip().endswith((".", "!", "?", '"', "'", ")")) or car.text.endswith("\n")
+    rep = system.receive(car.text, car.image, cfg, model, tok)
+    assert rep.ok and rep.message == secret
+
+
+def test_finish_sentence_off_keeps_old_text_shape(lm):
+    """With the option off (as in the recorded experiments) no tail is added."""
+    model, tok = lm
+    tcfg = text_channel.TextConfig(model_path=DEFAULT_LM, prompt=PROMPTS[0])
+    text, st = text_channel.encode(b"abc", tcfg, model, tok, key=b"k", nonce=5)
+    assert st.tail_tokens == 0
+    assert text_channel.decode(text, tcfg, model, tok, key=b"k") == b"abc"
+
+
+@pytest.mark.parametrize("prompt_id", [1, 6])
+def test_newline_fix_roundtrip(lm, prompt_id):
+    """Line breaks are shown doubled and halved back; the secret still comes back exactly."""
+    model, tok = lm
+    secret = b"line-break fix check " * 3
+    cfg = system.SendConfig(key=b"k", model_path=DEFAULT_LM, prompt=PROMPTS[prompt_id], image_method="lsbm",
+                            newline_fix=True)
+    car = system.send(secret, cover(), cfg, model, tok, msg_id=14)
+    body = car.text[len(PROMPTS[prompt_id]):]
+    assert "\n" not in body.replace("\n\n", "")  # every line break is shown doubled
+    rep = system.receive(car.text, car.image, cfg, model, tok)
+    assert rep.ok and rep.message == secret

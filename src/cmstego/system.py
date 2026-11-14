@@ -45,6 +45,8 @@ class SendConfig:
     text_share: Optional[float] = None  # None = fill-text rule; else fraction of the payload for the text
     fill: str = "fast"  # fill-text search: "fast" (sized from measured capacity, 1-3 encodes) or "exact" (bisection)
     aont: bool = True  # seal the secret in an all-or-nothing package before splitting (see aont.py)
+    finish_sentence: bool = True  # let the text end at a sentence boundary after the payload
+    newline_fix: bool = False  # show line breaks doubled (see TextConfig.newline_fix); off until measured on GPT-2
 
 
 @dataclasses.dataclass
@@ -61,7 +63,8 @@ class Carriers:
 
 def _text_cfg(cfg: SendConfig, limit: Optional[int]) -> text_channel.TextConfig:
     return text_channel.TextConfig(model_path=cfg.model_path, prompt=cfg.prompt, top_k=cfg.top_k, C=cfg.C,
-                                   max_new_tokens=limit, guard=cfg.text_guard)
+                                   max_new_tokens=limit, guard=cfg.text_guard,
+                                   finish_sentence=cfg.finish_sentence, newline_fix=cfg.newline_fix)
 
 
 def send(secret: bytes, cover: np.ndarray, cfg: SendConfig, model, tok, msg_id: Optional[int] = None) -> Carriers:

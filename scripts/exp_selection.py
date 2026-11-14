@@ -14,7 +14,12 @@ Reported for warden A (the training reward) and warden B (never seen in
 training): mean pooled suspicion and the fraction of pairs flagged at a 5%
 false-alarm rate, with 95% bootstrap intervals, plus carriers evaluated per message.
 
-Usage:  python scripts/exp_selection.py [--ppo-steps 60000]
+With --ensemble (needs the style-detector scores from add_style_detector.py),
+the policies are also trained against an ensemble of wardens (A, C, D: worst
+case) that shares no detector with warden B, and everything is evaluated under
+A, B and the ensemble. Results go to selection_ensemble_*.{csv,json}.
+
+Usage:  python scripts/exp_selection.py [--ppo-steps 60000] [--ensemble]
 """
 
 import argparse
@@ -47,10 +52,13 @@ def main():
     ap.add_argument("--episodes", type=int, default=1000)
     ap.add_argument("--ppo-steps", type=int, default=60000)
     ap.add_argument("--text-tag", default="text_filter_", help="which text variant's measurements to use")
+    ap.add_argument("--ensemble", action="store_true", help="also train against the warden ensemble (A, C, D)")
     args = ap.parse_args()
     t0 = time.time()
     T = P.build_tables(args.results, args.covers, text_tag=args.text_tag)
     print(f"tables built: {len(T.covers)} covers, {len(T.text)} held-out stego-texts ({time.time()-t0:.0f}s)")
+    if args.ensemble and not all(w in T.wardens for w in P.ENSEMBLE):
+        sys.exit("--ensemble needs style-detector scores: run scripts/add_style_detector.py first")
 
     # ---- PPO ----
     from stable_baselines3 import PPO
@@ -81,6 +89,26 @@ def main():
 
     strategies = {"none": P.strat_fixed_first, "random": P.strat_random, "heuristic": P.strat_heuristic,
                   "grid-A": P.strat_grid, "ppo": strat_ppo, "ppo-score": strat_ppo_score}
+    wardens = ("A", "B")
+    ens_train_s = None
+    prefix = "selection_"
+    if args.ensemble:
+        env3 = P.make_env(T, "train", TRAIN_PROMPTS, seed=1, warden="ENS", action="score")
+        model3 = PPO("MlpPolicy", env3, n_steps=512, batch_size=128, learning_rate=3e-4, ent_coef=0.0,
+                     gamma=0.0, seed=1, verbose=0)
+        t1 = time.time()
+        model3.learn(total_timesteps=args.ppo_steps)
+        ens_train_s = time.time() - t1
+        print(f"PPO (scoring policy) vs ensemble trained for {args.ppo_steps} steps in {ens_train_s:.0f}s")
+
+        def strat_ppo_ens(T_, ep, rng):
+            a, _ = model3.predict(P.observation(T_, ep), deterministic=True)
+            return (*P.score_action_to_choice(T_, ep, a), 1)
+
+        strategies["grid-ens"] = lambda T_, ep, rng: P.strat_grid(T_, ep, rng, w="ENS")
+        strategies["ppo-ens"] = strat_ppo_ens
+        wardens = ("A", "B", "ENS")
+        prefix = "selection_ensemble_"
 
     rows = []
     for split in ("test", "test_B"):
@@ -90,12 +118,12 @@ def main():
             srng = np.random.default_rng(7)
             for ep in episodes:
                 k, m, c, cost = fn(T, ep, srng)
-                for w in ("A", "B"):
+                for w in wardens:
                     s, f = P.evaluate(T, ep, k, m, c, w)
                     rows.append({"split": split, "strategy": name, "warden": w, "L": ep.L,
                                  "suspicion": s, "flagged": int(f), "evaluations": cost, "C": P.C_VALUES[c]})
     df = pd.DataFrame(rows)
-    df.to_csv(os.path.join(args.results, "selection_episodes.csv"), index=False)
+    df.to_csv(os.path.join(args.results, prefix + "episodes.csv"), index=False)
 
     summary = []
     for (split, name, w), g in df.groupby(["split", "strategy", "warden"], sort=False):
@@ -108,8 +136,10 @@ def main():
                         "share_C>0": float((g["C"] > 0).mean())})
     out = {"text_variant": args.text_tag, "episodes_per_split": args.episodes, "ppo_steps": args.ppo_steps, "ppo_train_seconds": ppo_train_s, "ppo_score_train_seconds": ppo2_train_s,
            "message_bytes": P.MESSAGE_BYTES, "K_covers": 8, "M_prompts": 4, "C_values": P.C_VALUES,
-           "summary": summary}
-    with open(os.path.join(args.results, "selection_summary.json"), "w", encoding="utf-8") as f:
+           "wardens": {w: P.WARDENS[w] for w in (("A", "B") + (P.ENSEMBLE if args.ensemble else ()))},
+           "ensemble": list(P.ENSEMBLE) if args.ensemble else None,
+           "ppo_ensemble_train_seconds": ens_train_s, "summary": summary}
+    with open(os.path.join(args.results, prefix + "summary.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
     print(pd.DataFrame(summary)[["split", "strategy", "warden", "mean_suspicion", "flag_rate",
                                  "evaluations_per_message", "share_C>0"]].round(3).to_string(index=False))

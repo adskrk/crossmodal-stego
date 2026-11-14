@@ -52,6 +52,11 @@ SHA-256 instead of a block cipher. It is a known technique, not our invention;
 using it to make a cross-modal split all-or-nothing is the design choice. It has
 not had an independent security review. `aont=False` restores the old split.
 
+**Compression.** Before locking, the secret is compressed (deflate or bz2,
+whichever is smaller, or not at all if that is smaller). A tab-separated table of
+186 bytes becomes 52; long English text shrinks about 3×. The package records
+which method was used.
+
 **Cost.** 18 extra bytes per message, and the text must carry at least 16 package
 bytes, so its paragraph is never shorter than about 120-130 GPT-2 tokens.
 
@@ -122,6 +127,24 @@ back as the same token — otherwise the receiver would see different tokens).
    Both produce text that always re-tokenises cleanly. Ordinary samples don't
    (40% contain a merge somewhere), and a detector holding the model can see
    that (AUC 0.71). So retry did not help and cost twice as many encodes.
+5. **The blank-line fingerprint, and a fix.** On GPT-2 the clearest case is a
+   blank line: GPT-2 writes it as one token ("\n\n"), but the word that follows
+   re-reads as "\n", "\n", word, so the filter never allows it. Result: 71% of
+   ordinary texts contain a blank line, 4% of stego-texts. With `newline_fix`,
+   tokens containing a blank line (or a line break right after another) are left
+   out of the alphabet, every line break the stego-text has is shown doubled, and
+   the receiver halves them back before decoding. Exact on the toy model; its
+   effect on GPT-2 detectability is measured by `run_overnight.bat`. Off by default
+   until then.
+6. **Ending at a sentence.** Hiding stops when the last bit is placed, often
+   mid-sentence. After that, the sender keeps writing with ordinary sampling
+   until a sentence ends (at most 40 tokens). The receiver stops reading once it
+   has the message, so these words carry nothing and are ignored. They pass the
+   same tokenisation filter, so they cannot change how the hidden part re-reads.
+7. **Sizing the text quickly.** The sender first offers the most the text may
+   take. If that overflows the target length, the coder reports how many bits it
+   had placed, which is this paragraph's measured capacity, and the next attempt
+   offers 92% of it. Usually 1-2 encodes instead of about 10 for a bisection.
 
 ---
 
@@ -218,6 +241,21 @@ the best — strong but expensive).
 (one decision per episode), the simplest RL setting. The multi-step version —
 a warden that collects evidence over many messages — is the planned extension.
 
+
+**Several wardens (`--ensemble`).** To test whether overfitting goes away when the
+policy sees more than one detector, a third text detector was added (a style
+detector: word and sentence lengths, vocabulary, punctuation, line breaks; no
+language model) and wardens C and D were formed from it with other image
+detectors. Training against the worst case of A, C and D, which share no detector
+with warden B, did not stop grid search from overfitting; PPO trained this way had
+the lowest flag rate under B, partly by preferring one lucky test prompt.
+
+**Choosing the split (`selection/split.py`, `exp_split.py`).** With the lock-box
+any split is equally safe for confidentiality, so the text share can be chosen for
+detectability alone: a longer text gives text detectors more to work with, a
+smaller image payload gives image detectors less. The policy picks a cover, a
+prompt and a text size from measured sizes (24, 64, 160 bytes). Its GPT-2
+measurements come from `run_overnight.bat`.
 
 ---
 
