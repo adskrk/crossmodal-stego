@@ -214,8 +214,10 @@ python scripts/add_style_detector.py --results results_gpt2         # third text
 python scripts/exp_selection.py --results results_gpt2 --ensemble   # selection trained against several wardens
 ```
 
-On Windows, `run_overnight.bat` runs the remaining GPT-2 measurements (line-break
-fix, fingerprint check, longer texts, split experiment) and rebuilds the report.
+On Windows, `run_overnight.bat` runs the GPT-2 measurements for the line-break fix,
+the fingerprint check, longer texts and the split experiment; `run_overnight_2.bat`
+then measures the final text channel (line-break fix, 16 texts per prompt and
+budget) and re-runs the selection experiments on it in `results_gpt2_nlfix/`.
 
 Without internet, `python scripts/make_toy_lm.py` builds a tiny offline model in
 `data/toy-lm`, which is what the numbers in `docs/RESULTS.md` used.

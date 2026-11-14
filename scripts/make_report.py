@@ -415,11 +415,11 @@ DET_NAMES = {"spam": "SPAM+LR", "effnet_hill": "EfficientNet-HILL", "effnet_lsbm
              "style": "style"}
 
 
-def ensemble_section(lines, rdir):
+def ensemble_section(lines, rdir, title="## 4. Training against several wardens (GPT-2 text measurements)"):
     s = json.load(open(os.path.join(rdir, "selection_ensemble_summary.json"), encoding="utf-8"))
     df = pd.DataFrame(s["summary"])
     w = s["wardens"]
-    lines += ["## 4. Training against several wardens (GPT-2 text measurements)", "",
+    lines += [title, "",
               "Overfitting to one warden was the main weakness found in section 3, so the same selection problem was "
               "repeated with an **ensemble** of wardens during training: "
               + "; ".join(f"{k} = {DET_NAMES[a]} (image) + {DET_NAMES[b]} (text)" for k, (a, b) in w.items()) +
@@ -494,6 +494,7 @@ def split_section(lines, rdir):
 
 
 G = "results_gpt2"
+G2 = "results_gpt2_nlfix"  # final text channel: line-break fix, more texts per prompt
 
 
 def main():
@@ -525,6 +526,11 @@ def main():
         ensemble_section(lines, G)
     if os.path.exists(os.path.join(G, "split_summary.json")):
         split_section(lines, G)
+    if os.path.exists(os.path.join(G2, "text_nlfix_measurements.csv")):
+        text_section(lines, G2, "## 6. Final text channel (GPT-2, line-break fix, 16 texts per prompt and budget)",
+                     "text_detectability_gpt2_nlfix.png", timing_note=False)
+        if os.path.exists(os.path.join(G2, "selection_ensemble_summary.json")):
+            ensemble_section(lines, G2, "## 7. Carrier selection on the final text channel (line-break fix, 4× more texts)")
     open(os.path.join(D, "RESULTS.md"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print("wrote docs/RESULTS.md")
 
