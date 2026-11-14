@@ -146,6 +146,25 @@ class _Keystream:
         return self.bits[:n]
 
 
+class CapacityExceeded(ValueError):
+    """The payload did not fit in ``max_new_tokens``.
+
+    ``bits_done`` is how many payload bits the coder had committed when it hit the
+    limit: a direct measurement of this passage's capacity, used by the sender to
+    size its next attempt instead of searching blindly.
+    """
+
+    def __init__(self, message: str, bits_done: int, bits_total: int):
+        super().__init__(message)
+        self.bits_done = bits_done
+        self.bits_total = bits_total
+
+
+def payload_bit_length(nbytes: int, key: Optional[bytes]) -> int:
+    """Length of the coded bitstream for ``nbytes`` of data (independent of content)."""
+    return len(_payload_bits(bytes(nbytes), key, 0))
+
+
 def _payload_bits(data: bytes, key: Optional[bytes], nonce: int) -> List[int]:
     frame = _frame_payload(data)
     if key is None:
@@ -242,7 +261,7 @@ def _encode_once(bits: List[int], cfg: TextConfig, model, tokenizer):
     generated = stagnant = 0
     while len(mirror.bits) < total:
         if cfg.max_new_tokens is not None and generated >= cfg.max_new_tokens:
-            raise ValueError(f"payload needs more than {cfg.max_new_tokens} tokens")
+            raise CapacityExceeded(f"payload needs more than {cfg.max_new_tokens} tokens", len(mirror.bits), total)
         if stagnant >= _STALL_LIMIT:
             raise ValueError("arithmetic coder stopped making progress")
         before = len(mirror.bits)

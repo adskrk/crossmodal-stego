@@ -3,7 +3,9 @@
 Sender
   1. Decide the split. Default rule ("fill-text"): give the text channel as many
      secret bytes as fit in a natural-length passage (``max_text_tokens``), the
-     image gets the rest. A fixed ratio can be forced instead, for baselines.
+     image gets the rest. The size is found from the coder's own capacity
+     measurement (usually 1-2 encodes); ``fill="exact"`` keeps the original
+     bisection. A fixed ratio can be forced instead, for baselines.
   2. Build two sealed fragments (framing.split_message).
   3. Hide the text fragment with the LLM coder and the image fragment with the
      chosen image method.
@@ -41,6 +43,7 @@ class SendConfig:
     max_text_tokens: int = 150
     text_guard: str = "filter"  # "filter" (subtext-codec) or "retry" (OD-Stega style); experiments found equal detectability, filter is cheaper
     text_share: Optional[float] = None  # None = fill-text rule; else fraction of secret bytes
+    fill: str = "fast"  # fill-text search: "fast" (sized from measured capacity, 1-3 encodes) or "exact" (bisection)
 
 
 @dataclasses.dataclass
@@ -77,10 +80,10 @@ def send(secret: bytes, cover: np.ndarray, cfg: SendConfig, model, tok, msg_id: 
         result = try_text(best)
         if result is None:
             raise ValueError("text fragment could not be encoded")
-    else:
-        # Fill-text rule: the most secret bytes whose fragment fits in
-        # max_text_tokens. Every probe is a real encode (capacity depends on the
-        # prompt and on chance), found by bisection over the byte count.
+    elif cfg.fill == "exact":
+        # Original fill-text search: the most secret bytes whose fragment fits in
+        # max_text_tokens, by bisection over the byte count. Every probe is a real
+        # encode, so this needs about log2(len(secret)) + 1 encodes.
         lo, hi = 0, len(secret)
         result = try_text(0)
         if result is None:
@@ -93,6 +96,8 @@ def send(secret: bytes, cover: np.ndarray, cfg: SendConfig, model, tok, msg_id: 
                 lo, best, result = mid, mid, r
             else:
                 hi = mid - 1
+    else:
+        best, result = _fast_fill(secret, msg_id, cfg, tcfg, model, tok)
 
     text, tstats = result
     _, imf = split_message(secret, best, msg_id, cfg.key)
@@ -114,3 +119,39 @@ def receive(text: Optional[str], image: Optional[np.ndarray], cfg: SendConfig, m
     except Exception:
         imf = None
     return join_fragments(tf, imf, cfg.key)
+
+
+_MARGIN = 0.92        # aim this far below the measured capacity
+_MAX_ATTEMPTS = 4
+
+
+def _fast_fill(secret: bytes, msg_id: int, cfg: SendConfig, tcfg, model, tok):
+    """Fill-text split sized from measured capacity instead of bisection.
+
+    Attempt 1 offers the whole secret. If it fits, that is the answer (one
+    encode). If not, the coder reports how many payload bits it had placed when
+    it ran out of tokens; that is this passage's measured capacity, and the next
+    attempt offers ``_MARGIN`` of it. Usually 1 encode for short secrets and 2
+    for long ones, versus ~log2(n)+1 for bisection. The text may hold a few
+    bytes less than the exact maximum; the image takes the rest, so recovery is
+    unaffected.
+    """
+    base = text_channel.payload_bit_length(len(split_message(secret, 0, msg_id, cfg.key)[0]), cfg.key)
+
+    def bytes_for(bit_budget: float) -> int:
+        return max(0, min(len(secret), int((bit_budget - base) // 8)))
+
+    size, margin = len(secret), _MARGIN
+    for _ in range(_MAX_ATTEMPTS):
+        tf, _ = split_message(secret, size, msg_id, cfg.key)
+        try:
+            return size, text_channel.encode(tf, tcfg, model, tok, key=cfg.key)
+        except text_channel.CapacityExceeded as e:
+            nxt = bytes_for(margin * e.bits_done)
+            margin *= 0.9
+        except ValueError:  # e.g. the retry guard found no clean tokenisation
+            nxt = int(size * 0.8)
+        if size == 0:
+            break
+        size = min(nxt, size - 1)
+    raise ValueError("could not fit a text fragment; raise max_text_tokens")

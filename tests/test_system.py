@@ -71,3 +71,35 @@ def test_wrong_key_fails(lm):
     car = system.send(b"secret", cover(), cfg, model, tok)
     bad = system.SendConfig(key=b"wrong", model_path=DEFAULT_LM, prompt=PROMPTS[1], image_method="lsbm")
     assert not system.receive(car.text, car.image, bad, model, tok).ok
+
+
+@pytest.mark.parametrize("n", [5, 60, 3000])
+def test_fast_fill_uses_few_encodes(lm, n, monkeypatch):
+    model, tok = lm
+    calls = {"n": 0}
+    orig = text_channel._encode_once
+
+    def counting(*a, **k):
+        calls["n"] += 1
+        return orig(*a, **k)
+
+    monkeypatch.setattr(text_channel, "_encode_once", counting)
+    secret = (b"Meet at the library at 5pm. " * 200)[:n]
+    cfg = system.SendConfig(key=b"k", model_path=DEFAULT_LM, prompt=PROMPTS[3], image_method="hill",
+                            max_text_tokens=100)
+    car = system.send(secret, cover(), cfg, model, tok, msg_id=9)
+    assert calls["n"] <= 4
+    assert car.text_stats.tokens <= 100
+    assert car.text_bytes + car.image_bytes == len(secret)
+    rep = system.receive(car.text, car.image, cfg, model, tok)
+    assert rep.ok and rep.message == secret
+
+
+def test_exact_fill_still_available(lm):
+    model, tok = lm
+    secret = b"exact bisection path " * 3
+    cfg = system.SendConfig(key=b"k", model_path=DEFAULT_LM, prompt=PROMPTS[0], image_method="lsbm",
+                            max_text_tokens=100, fill="exact")
+    car = system.send(secret, cover(), cfg, model, tok, msg_id=10)
+    rep = system.receive(car.text, car.image, cfg, model, tok)
+    assert rep.ok and rep.message == secret

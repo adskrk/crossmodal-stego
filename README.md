@@ -10,7 +10,10 @@ selection) is compared across simple baselines and PPO.
 ## How it works
 
 1. **Split and frame.** The secret is cut into a text fragment and an image
-   fragment. Each gets a header with a message id, offset, total length and CRC32,
+   fragment. The text gets as many bytes as fit in a short passage
+   (`max_text_tokens`); the sender first offers the whole secret and, if it does
+   not fit, uses the coder's measured capacity to size a second attempt, so a
+   send needs 1-2 text encodes. The image takes the rest. Each gets a header with a message id, offset, total length and CRC32,
    and is whitened by XOR with a SHAKE-256 keystream from the shared key. Whitening
    makes the bits look random for the text coder; it is not claimed as
    encryption-grade security.
@@ -171,6 +174,7 @@ python scripts/exp_text.py --model gpt2 --variant retry --cs 0      # text: + no
 python scripts/diag_text_fingerprint.py --model gpt2                # what the white-box detector sees
 python scripts/exp_selection.py                                     # warden + baselines + PPO
 python scripts/make_report.py                                       # docs/RESULTS.md + figures
+python scripts/bench_send.py --model gpt2                           # sender speed: old vs new split search
 ```
 
 Without internet, `python scripts/make_toy_lm.py` builds a tiny offline model in
