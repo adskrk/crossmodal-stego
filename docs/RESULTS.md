@@ -319,3 +319,71 @@ Text fragment sizes measured on GPT-2 at C = 0: 24 bytes ≈ 81 tokens, 64 bytes
 | 64 | 173 | 0.54 [0.38, 0.69] | 0.82 [0.69, 0.94] | 0.75 [0.60, 0.89] | 24 |
 | 160 | 409 | 0.50 [0.32, 0.67] | 0.81 [0.68, 0.93] | 0.71 [0.56, 0.85] | 24 |
 
+## 6. Final text channel (GPT-2, line-break fix, 16 texts per prompt and budget)
+
+1 variant(s) of the text coder were run on the same 12 prompts with 24-byte random payloads. Covers are ordinary top-64 samples from the same model, cut to the same token count.
+
+**Exact recovery: 384 / 384 stego-texts (100.0%) across all variants.** No message failed to encode.
+
+*Timings: one experiment at a time on a laptop CPU (no GPU); encode includes the per-step tokenisation filter, decode is a single pass.*
+
+| Variant | C | n | Payload bits / token | KL vs full model (bits/token) | KL vs top-k sampling (bits/token) | Encodes per message | Encode s (median) | Decode s (median) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| nlfix | 0 | 192 | 2.38 | 0.4309 | 0.1070 | 1.0 | 4.25 | 4.24 |
+| nlfix | 0.1 | 192 | 3.06 | 0.6593 | 0.3152 | 1.0 | 3.79 | 3.74 |
+
+### Detectability (held-out ROC-AUC; 0.5 = chance)
+
+| Variant | C | N-gram detector (black box) | Likelihood detector (white box) | Style detector (black box) | Test pairs |
+| --- | --- | --- | --- | --- | --- |
+| nlfix | 0 | 0.60 [0.52, 0.68] | 0.60 [0.52, 0.69] | 0.50 [0.41, 0.57] | 96 |
+| nlfix | 0.1 | 0.70 [0.63, 0.77] | 1.00 [0.99, 1.00] | 0.82 [0.76, 0.87] | 96 |
+
+| Variant | C | N-gram detector: P_E / caught @5% FA | Likelihood detector: P_E / caught @5% FA | Style detector: P_E / caught @5% FA |
+| --- | --- | --- | --- | --- |
+| nlfix | 0 | 0.39 / 11% | 0.39 / 3% | 0.45 / 6% |
+| nlfix | 0.1 | 0.31 / 17% | 0.02 / 99% | 0.26 / 38% |
+
+The style detector (word and sentence lengths, vocabulary richness, punctuation, line breaks; no language model) was added later and scored on the same saved texts with the same train/test split (`scripts/add_style_detector.py`).
+
+**Blank lines.** Share of texts containing at least one blank line (two line breaks in a row):
+
+| Variant | C | Ordinary texts | Stego-texts |
+| --- | --- | --- | --- |
+| nlfix | 0 | 136/192 (71%) | 144/192 (75%) |
+| nlfix | 0.1 | 129/192 (67%) | 97/192 (51%) |
+
+Variants: **clear** = subtext-codec framing as-is (length field in clear), filter guard; **filter** = + nonce and whitening, filter guard (final system); **retry** = + nonce and whitening, retry guard (OD-Stega style); **nlfix** = filter + line-break fix (blank-line tokens banned, line breaks shown doubled).
+
+![Text detectability by variant](figures/text_detectability_gpt2_nlfix.png)
+
+## 7. Carrier selection on the final text channel (line-break fix, 4× more texts)
+
+Overfitting to one warden was the main weakness found in section 3, so the same selection problem was repeated with an **ensemble** of wardens during training: A = SPAM+LR (image) + n-gram (text); B = EfficientNet-HILL (image) + likelihood (text); C = EfficientNet-LSBM (image) + style (text); D = SPA (image) + style (text). The ensemble (ENS) is the worst case over A, C, D: the highest suspicion, flagged if any one flags. It shares no detector with warden B, which is never used in training. PPO here is the scoring policy, 60,000 steps. Baselines are recomputed in this run; PPO policies are retrained.
+
+### Unseen Kodak photos + unseen prompts
+
+| Strategy | Flag rate, A | Flag rate, ENS (training ensemble) | Flag rate, B (never trained on) | Suspicion, B |
+| --- | --- | --- | --- | --- |
+| No selection | 0.15 [0.13, 0.18] | 0.22 [0.19, 0.24] | 0.04 [0.03, 0.06] | 0.77 [0.76, 0.79] |
+| Heuristic | 0.28 [0.25, 0.31] | 0.28 [0.25, 0.31] | 0.00 [0.00, 0.00] | 0.73 [0.72, 0.75] |
+| Random | 0.09 [0.07, 0.10] | 0.24 [0.22, 0.27] | 0.49 [0.46, 0.52] | 0.87 [0.86, 0.89] |
+| Grid search (vs A) | 0.00 [0.00, 0.00] | 0.16 [0.14, 0.18] | 0.35 [0.32, 0.38] | 0.85 [0.84, 0.86] |
+| Grid search (vs ensemble) | 0.00 [0.00, 0.00] | 0.00 [0.00, 0.00] | 0.12 [0.10, 0.14] | 0.78 [0.76, 0.79] |
+| PPO (scoring policy, vs A) | 0.01 [0.00, 0.01] | 0.12 [0.10, 0.14] | 0.03 [0.02, 0.04] | 0.74 [0.72, 0.75] |
+| PPO (scoring policy, vs ensemble) | 0.32 [0.29, 0.35] | 0.38 [0.35, 0.41] | 0.10 [0.09, 0.12] | 0.86 [0.85, 0.87] |
+| PPO v1 (slot-index policy) | 0.14 [0.12, 0.16] | 0.19 [0.17, 0.22] | 0.02 [0.01, 0.03] | 0.76 [0.75, 0.77] |
+
+### Unseen image source + unseen prompts
+
+| Strategy | Flag rate, A | Flag rate, ENS (training ensemble) | Flag rate, B (never trained on) | Suspicion, B |
+| --- | --- | --- | --- | --- |
+| No selection | 0.22 [0.19, 0.24] | 0.29 [0.26, 0.32] | 0.08 [0.06, 0.09] | 0.71 [0.69, 0.72] |
+| Heuristic | 0.28 [0.26, 0.31] | 0.41 [0.38, 0.44] | 0.00 [0.00, 0.00] | 0.72 [0.70, 0.74] |
+| Random | 0.16 [0.14, 0.18] | 0.30 [0.27, 0.33] | 0.50 [0.47, 0.53] | 0.84 [0.82, 0.85] |
+| Grid search (vs A) | 0.00 [0.00, 0.00] | 0.17 [0.15, 0.19] | 0.28 [0.25, 0.30] | 0.77 [0.76, 0.79] |
+| Grid search (vs ensemble) | 0.00 [0.00, 0.00] | 0.00 [0.00, 0.00] | 0.16 [0.14, 0.18] | 0.73 [0.72, 0.75] |
+| PPO (scoring policy, vs A) | 0.01 [0.01, 0.02] | 0.18 [0.16, 0.20] | 0.00 [0.00, 0.01] | 0.60 [0.58, 0.62] |
+| PPO (scoring policy, vs ensemble) | 0.29 [0.27, 0.32] | 0.43 [0.40, 0.46] | 0.00 [0.00, 0.00] | 0.75 [0.74, 0.77] |
+| PPO v1 (slot-index policy) | 0.19 [0.17, 0.22] | 0.27 [0.24, 0.30] | 0.04 [0.03, 0.05] | 0.69 [0.68, 0.71] |
+

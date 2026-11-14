@@ -1,0 +1,860 @@
+{
+  "text_variant": "text_nlfix_",
+  "episodes_per_split": 1000,
+  "ppo_steps": 60000,
+  "ppo_train_seconds": 288.0817515850067,
+  "ppo_score_train_seconds": 283.0033209323883,
+  "message_bytes": [
+    500,
+    2000,
+    6000
+  ],
+  "K_covers": 8,
+  "M_prompts": 4,
+  "C_values": [
+    0.0,
+    0.1
+  ],
+  "wardens": {
+    "A": [
+      "spam",
+      "ngram"
+    ],
+    "B": [
+      "effnet_hill",
+      "likelihood"
+    ],
+    "C": [
+      "effnet_lsbm",
+      "style"
+    ],
+    "D": [
+      "spa",
+      "style"
+    ]
+  },
+  "ensemble": [
+    "A",
+    "C",
+    "D"
+  ],
+  "ppo_ensemble_train_seconds": 315.51455426216125,
+  "summary": [
+    {
+      "split": "test",
+      "strategy": "none",
+      "warden": "A",
+      "mean_suspicion": 0.6860698506206606,
+      "susp_ci": [
+        0.673249459551862,
+        0.6987750565432358
+      ],
+      "flag_rate": 0.155,
+      "flag_ci": [
+        0.133,
+        0.178
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "none",
+      "warden": "B",
+      "mean_suspicion": 0.773951083526194,
+      "susp_ci": [
+        0.7607519527140754,
+        0.7864646302335366
+      ],
+      "flag_rate": 0.041,
+      "flag_ci": [
+        0.029,
+        0.055
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "none",
+      "warden": "ENS",
+      "mean_suspicion": 0.8321456974542396,
+      "susp_ci": [
+        0.8225407479486639,
+        0.8414920142541553
+      ],
+      "flag_rate": 0.218,
+      "flag_ci": [
+        0.192,
+        0.244
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "random",
+      "warden": "A",
+      "mean_suspicion": 0.7225865243004419,
+      "susp_ci": [
+        0.7093108339469808,
+        0.7352826898800758
+      ],
+      "flag_rate": 0.085,
+      "flag_ci": [
+        0.068,
+        0.103
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.488
+    },
+    {
+      "split": "test",
+      "strategy": "random",
+      "warden": "B",
+      "mean_suspicion": 0.8747777719335157,
+      "susp_ci": [
+        0.8632579331474858,
+        0.8862463628234799
+      ],
+      "flag_rate": 0.493,
+      "flag_ci": [
+        0.463975,
+        0.524
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.488
+    },
+    {
+      "split": "test",
+      "strategy": "random",
+      "warden": "ENS",
+      "mean_suspicion": 0.8620419734904271,
+      "susp_ci": [
+        0.8536601580580686,
+        0.8707294932148117
+      ],
+      "flag_rate": 0.243,
+      "flag_ci": [
+        0.217,
+        0.27
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.488
+    },
+    {
+      "split": "test",
+      "strategy": "heuristic",
+      "warden": "A",
+      "mean_suspicion": 0.6796979276246582,
+      "susp_ci": [
+        0.6648852934988428,
+        0.6943475844203661
+      ],
+      "flag_rate": 0.279,
+      "flag_ci": [
+        0.252,
+        0.307
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "heuristic",
+      "warden": "B",
+      "mean_suspicion": 0.7337878708184306,
+      "susp_ci": [
+        0.7189360311908268,
+        0.7487309948979592
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "heuristic",
+      "warden": "ENS",
+      "mean_suspicion": 0.8800281401220283,
+      "susp_ci": [
+        0.8706698493057017,
+        0.8885850397117611
+      ],
+      "flag_rate": 0.279,
+      "flag_ci": [
+        0.252,
+        0.307
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "grid-A",
+      "warden": "A",
+      "mean_suspicion": 0.28852661476961916,
+      "susp_ci": [
+        0.2800093177992846,
+        0.29733685961498
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.36
+    },
+    {
+      "split": "test",
+      "strategy": "grid-A",
+      "warden": "B",
+      "mean_suspicion": 0.850939722280665,
+      "susp_ci": [
+        0.8376851172943404,
+        0.8640912002945508
+      ],
+      "flag_rate": 0.349,
+      "flag_ci": [
+        0.32,
+        0.379
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.36
+    },
+    {
+      "split": "test",
+      "strategy": "grid-A",
+      "warden": "ENS",
+      "mean_suspicion": 0.7784782768777615,
+      "susp_ci": [
+        0.7672865479697033,
+        0.7891396183989059
+      ],
+      "flag_rate": 0.158,
+      "flag_ci": [
+        0.136,
+        0.181
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.36
+    },
+    {
+      "split": "test",
+      "strategy": "ppo",
+      "warden": "A",
+      "mean_suspicion": 0.6755611718914369,
+      "susp_ci": [
+        0.6627095242478436,
+        0.6878201806753629
+      ],
+      "flag_rate": 0.136,
+      "flag_ci": [
+        0.115,
+        0.158
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "ppo",
+      "warden": "B",
+      "mean_suspicion": 0.7627995476541132,
+      "susp_ci": [
+        0.750512648590364,
+        0.7748440103618768
+      ],
+      "flag_rate": 0.018,
+      "flag_ci": [
+        0.01,
+        0.027
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "ppo",
+      "warden": "ENS",
+      "mean_suspicion": 0.8291479065853146,
+      "susp_ci": [
+        0.8205228605617505,
+        0.837885140963602
+      ],
+      "flag_rate": 0.194,
+      "flag_ci": [
+        0.169,
+        0.218
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "ppo-score",
+      "warden": "A",
+      "mean_suspicion": 0.5406324426677888,
+      "susp_ci": [
+        0.5304445915737428,
+        0.5510676165053651
+      ],
+      "flag_rate": 0.007,
+      "flag_ci": [
+        0.002,
+        0.013
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "ppo-score",
+      "warden": "B",
+      "mean_suspicion": 0.7360178834420367,
+      "susp_ci": [
+        0.7210947164948454,
+        0.7504598174836946
+      ],
+      "flag_rate": 0.028,
+      "flag_ci": [
+        0.018,
+        0.039
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "ppo-score",
+      "warden": "ENS",
+      "mean_suspicion": 0.7666114559225752,
+      "susp_ci": [
+        0.7557977645697455,
+        0.7769025444456132
+      ],
+      "flag_rate": 0.12,
+      "flag_ci": [
+        0.1,
+        0.141
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "grid-ens",
+      "warden": "A",
+      "mean_suspicion": 0.4271241847254365,
+      "susp_ci": [
+        0.41820457868714495,
+        0.4357145986745213
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.164
+    },
+    {
+      "split": "test",
+      "strategy": "grid-ens",
+      "warden": "B",
+      "mean_suspicion": 0.776014517147065,
+      "susp_ci": [
+        0.7629347425310331,
+        0.7894669379865349
+      ],
+      "flag_rate": 0.121,
+      "flag_ci": [
+        0.101,
+        0.141
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.164
+    },
+    {
+      "split": "test",
+      "strategy": "grid-ens",
+      "warden": "ENS",
+      "mean_suspicion": 0.4752669366715759,
+      "susp_ci": [
+        0.46761834236271826,
+        0.4828310093625079
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.164
+    },
+    {
+      "split": "test",
+      "strategy": "ppo-ens",
+      "warden": "A",
+      "mean_suspicion": 0.7546810435514413,
+      "susp_ci": [
+        0.7416926493793394,
+        0.7667268422575216
+      ],
+      "flag_rate": 0.317,
+      "flag_ci": [
+        0.289,
+        0.347
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "ppo-ens",
+      "warden": "B",
+      "mean_suspicion": 0.8644683357879235,
+      "susp_ci": [
+        0.8539922456869345,
+        0.8746155546496951
+      ],
+      "flag_rate": 0.105,
+      "flag_ci": [
+        0.086,
+        0.124
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test",
+      "strategy": "ppo-ens",
+      "warden": "ENS",
+      "mean_suspicion": 0.8774841678939618,
+      "susp_ci": [
+        0.868752265674311,
+        0.8852376827792974
+      ],
+      "flag_rate": 0.375,
+      "flag_ci": [
+        0.346,
+        0.405
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "none",
+      "warden": "A",
+      "mean_suspicion": 0.8716584262571007,
+      "susp_ci": [
+        0.8633913515148327,
+        0.8794692036608458
+      ],
+      "flag_rate": 0.218,
+      "flag_ci": [
+        0.190975,
+        0.244
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "none",
+      "warden": "B",
+      "mean_suspicion": 0.7080199873763938,
+      "susp_ci": [
+        0.6915789317273301,
+        0.7239648432568905
+      ],
+      "flag_rate": 0.076,
+      "flag_ci": [
+        0.06,
+        0.092
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "none",
+      "warden": "ENS",
+      "mean_suspicion": 0.9022830317694088,
+      "susp_ci": [
+        0.8953767278560908,
+        0.90873273590364
+      ],
+      "flag_rate": 0.287,
+      "flag_ci": [
+        0.258,
+        0.316
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "random",
+      "warden": "A",
+      "mean_suspicion": 0.8798742899221544,
+      "susp_ci": [
+        0.8723721596886177,
+        0.8873796312855038
+      ],
+      "flag_rate": 0.16,
+      "flag_ci": [
+        0.138,
+        0.183
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.488
+    },
+    {
+      "split": "test_B",
+      "strategy": "random",
+      "warden": "B",
+      "mean_suspicion": 0.838623921733642,
+      "susp_ci": [
+        0.8241849121607406,
+        0.8534824387229119
+      ],
+      "flag_rate": 0.5,
+      "flag_ci": [
+        0.471,
+        0.53
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.488
+    },
+    {
+      "split": "test_B",
+      "strategy": "random",
+      "warden": "ENS",
+      "mean_suspicion": 0.9140918893330529,
+      "susp_ci": [
+        0.9081618845992006,
+        0.9198980052072375
+      ],
+      "flag_rate": 0.299,
+      "flag_ci": [
+        0.27,
+        0.328
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.488
+    },
+    {
+      "split": "test_B",
+      "strategy": "heuristic",
+      "warden": "A",
+      "mean_suspicion": 0.8943087523669261,
+      "susp_ci": [
+        0.8884454199978961,
+        0.9001805267725647
+      ],
+      "flag_rate": 0.284,
+      "flag_ci": [
+        0.257,
+        0.312
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "heuristic",
+      "warden": "B",
+      "mean_suspicion": 0.7188652430044185,
+      "susp_ci": [
+        0.7031020342415317,
+        0.7351066221333894
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "heuristic",
+      "warden": "ENS",
+      "mean_suspicion": 0.9237828739743321,
+      "susp_ci": [
+        0.9191902009257312,
+        0.9281531361771513
+      ],
+      "flag_rate": 0.407,
+      "flag_ci": [
+        0.377,
+        0.437
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "grid-A",
+      "warden": "A",
+      "mean_suspicion": 0.5455868398905954,
+      "susp_ci": [
+        0.5334636045655374,
+        0.5583508507784556
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.279
+    },
+    {
+      "split": "test_B",
+      "strategy": "grid-A",
+      "warden": "B",
+      "mean_suspicion": 0.7739119503471492,
+      "susp_ci": [
+        0.7576198440458657,
+        0.7900945126762047
+      ],
+      "flag_rate": 0.276,
+      "flag_ci": [
+        0.249,
+        0.303
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.279
+    },
+    {
+      "split": "test_B",
+      "strategy": "grid-A",
+      "warden": "ENS",
+      "mean_suspicion": 0.7355403429413002,
+      "susp_ci": [
+        0.7224623053860719,
+        0.7487825044708605
+      ],
+      "flag_rate": 0.168,
+      "flag_ci": [
+        0.148,
+        0.191
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.279
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo",
+      "warden": "A",
+      "mean_suspicion": 0.8641041973490426,
+      "susp_ci": [
+        0.8549341941931412,
+        0.8723171970334527
+      ],
+      "flag_rate": 0.193,
+      "flag_ci": [
+        0.168,
+        0.217
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo",
+      "warden": "B",
+      "mean_suspicion": 0.6948765516515885,
+      "susp_ci": [
+        0.6784987902377446,
+        0.7101870226698926
+      ],
+      "flag_rate": 0.04,
+      "flag_ci": [
+        0.028,
+        0.052
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo",
+      "warden": "ENS",
+      "mean_suspicion": 0.9007870818430465,
+      "susp_ci": [
+        0.8941160240900485,
+        0.9069036200820535
+      ],
+      "flag_rate": 0.272,
+      "flag_ci": [
+        0.244,
+        0.299
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo-score",
+      "warden": "A",
+      "mean_suspicion": 0.8440311382284872,
+      "susp_ci": [
+        0.8380621738901746,
+        0.849528441247633
+      ],
+      "flag_rate": 0.012,
+      "flag_ci": [
+        0.006,
+        0.019
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo-score",
+      "warden": "B",
+      "mean_suspicion": 0.5991314958973281,
+      "susp_ci": [
+        0.5805109444035347,
+        0.6170156769408796
+      ],
+      "flag_rate": 0.002,
+      "flag_ci": [
+        0.0,
+        0.005
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo-score",
+      "warden": "ENS",
+      "mean_suspicion": 0.8691450662739322,
+      "susp_ci": [
+        0.863868748685041,
+        0.8741951083526194
+      ],
+      "flag_rate": 0.182,
+      "flag_ci": [
+        0.158,
+        0.205
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "grid-ens",
+      "warden": "A",
+      "mean_suspicion": 0.5878092257521566,
+      "susp_ci": [
+        0.5755696270776351,
+        0.6001542223332632
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.144
+    },
+    {
+      "split": "test_B",
+      "strategy": "grid-ens",
+      "warden": "B",
+      "mean_suspicion": 0.7346446980854198,
+      "susp_ci": [
+        0.7183199387229119,
+        0.7508140818956449
+      ],
+      "flag_rate": 0.159,
+      "flag_ci": [
+        0.138,
+        0.183
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.144
+    },
+    {
+      "split": "test_B",
+      "strategy": "grid-ens",
+      "warden": "ENS",
+      "mean_suspicion": 0.6243951714706502,
+      "susp_ci": [
+        0.6144711682095518,
+        0.6346158623500947
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 64.0,
+      "share_C>0": 0.144
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo-ens",
+      "warden": "A",
+      "mean_suspicion": 0.8790428150641699,
+      "susp_ci": [
+        0.8697133349989481,
+        0.8888885822112349
+      ],
+      "flag_rate": 0.295,
+      "flag_ci": [
+        0.267,
+        0.323
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo-ens",
+      "warden": "B",
+      "mean_suspicion": 0.7539165790027351,
+      "susp_ci": [
+        0.739750344519251,
+        0.7668182174416159
+      ],
+      "flag_rate": 0.0,
+      "flag_ci": [
+        0.0,
+        0.0
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    },
+    {
+      "split": "test_B",
+      "strategy": "ppo-ens",
+      "warden": "ENS",
+      "mean_suspicion": 0.9177432674100569,
+      "susp_ci": [
+        0.9110198006522197,
+        0.9248733720807911
+      ],
+      "flag_rate": 0.431,
+      "flag_ci": [
+        0.4,
+        0.46
+      ],
+      "evaluations_per_message": 1.0,
+      "share_C>0": 0.0
+    }
+  ]
+}
