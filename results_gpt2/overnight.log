@@ -1,0 +1,44 @@
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights:  57%|█████▋    | 85/148 [00:00<00:00, 845.45it/s]Loading weights: 100%|██████████| 148/148 [00:00<00:00, 1127.66it/s]
+C=0.0: done (1291s)
+C=0.1: done (2417s)
+encode failures: 0
+C=0.0 ngram: AUC 0.549 on 48 held-out pairs
+C=0.0 likelihood: AUC 0.763 on 48 held-out pairs
+C=0.1 ngram: AUC 0.638 on 48 held-out pairs
+C=0.1 likelihood: AUC 1.000 on 48 held-out pairs
+total 2529s
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights: 100%|██████████| 148/148 [00:00<00:00, 1598.92it/s]
+C=0.0: done (1386s)
+encode failures: 0
+C=0.0 ngram: AUC 0.990 on 48 held-out pairs
+C=0.0 likelihood: AUC 0.909 on 48 held-out pairs
+total 1437s
+tables built: 195 covers, 96 held-out stego-texts (30s)
+PPO trained for 60000 steps in 244s
+PPO (scoring policy) trained for 60000 steps in 242s
+ split  strategy warden  mean_suspicion  flag_rate  evaluations_per_message  share_C>0
+  test      none      A           0.657      0.025                      1.0      0.000
+  test      none      B           0.830      0.206                      1.0      0.000
+  test    random      A           0.670      0.083                      1.0      0.488
+  test    random      B           0.898      0.571                      1.0      0.488
+  test heuristic      A           0.563      0.000                      1.0      0.000
+  test heuristic      B           0.684      0.238                      1.0      0.000
+  test    grid-A      A           0.156      0.000                     64.0      0.439
+  test    grid-A      B           0.910      0.486                     64.0      0.439
+  test       ppo      A           0.640      0.000                      1.0      0.000
+  test       ppo      B           0.828      0.205                      1.0      0.000
+  test ppo-score      A           0.688      0.002                      1.0      0.000
+  test ppo-score      B           0.905      0.268                      1.0      0.000
+test_B      none      A           0.855      0.094                      1.0      0.000
+test_B      none      B           0.775      0.233                      1.0      0.000
+test_B    random      A           0.865      0.149                      1.0      0.488
+test_B    random      B           0.877      0.578                      1.0      0.488
+test_B heuristic      A           0.850      0.008                      1.0      0.000
+test_B heuristic      B           0.673      0.238                      1.0      0.000
+test_B    grid-A      A           0.515      0.000                     64.0      0.319
+test_B    grid-A      B           0.858      0.477                     64.0      0.319
+test_B       ppo      A           0.850      0.086                      1.0      0.000
+test_B       ppo      B           0.774      0.228                      1.0      0.000
+test_B ppo-score      A           0.873      0.009                      1.0      0.000
+test_B ppo-score      B           0.894      0.247                      1.0      0.000
+total 541s

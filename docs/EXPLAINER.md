@@ -1,8 +1,5 @@
 # How the system works — plain-language guide
 
-This is for you to read before the faculty review. Each section says what a
-part does, why it is built that way, and questions you may be asked.
-
 ---
 
 ## 1. The big picture
@@ -43,10 +40,6 @@ mixing up pieces from two different messages.
 (SHAKE-256). Arithmetic-coding steganography assumes the hidden bits look
 random; plain English text does not. Whitening makes them random-looking. We
 do *not* claim this is encryption-grade security; it is an ablation switch.
-
-**Possible question:** *Why not encrypt?* — Encryption was not a requirement.
-Whitening gives the uniform bits the text coder needs. Real encryption (e.g.
-AES-GCM) can be added before framing without changing anything else.
 
 ---
 
@@ -99,17 +92,6 @@ back as the same token — otherwise the receiver would see different tokens).
    (40% contain a merge somewhere), and a detector holding the model can see
    that (AUC 0.71). So retry did not help and cost twice as many encodes.
 
-**Possible questions.**
-- *Is it provably undetectable?* — No. Low KL is necessary but not sufficient.
-  Our first-stage results are a concrete example: KL vs ordinary sampling was only 0.016
-  bits/token at C = 0, yet a white-box detector reached AUC 0.71, because of
-  the tokenisation fingerprint above. KL(stego‖cover) is small, but
-  KL(cover‖stego) is infinite: covers contain events stego-text never has.
-- *Why does editing one word break it?* — The receiver must see exactly the same
-  tokens. This is an exact-bit scheme, not an error-correcting one.
-- *What if the receiver uses a different library version?* — The probabilities
-  could differ slightly and decoding would fail; we pin versions.
-
 ---
 
 ## 4. Image channel (`src/cmstego/image_channel.py`)
@@ -134,11 +116,6 @@ them. We now count only *usable* values, cap HILL + STC at 0.4 bits per usable
 value, refuse larger payloads, and decode every stego image once before
 returning it. We also replaced pySTC's fixed 64-value length header with a
 1024-value one, because 64 values can all land in a flat area.
-
-**Possible question:** *What is STC in one sentence?* — The receiver computes
-H·x (a fixed sparse binary matrix times the image's last bits) and gets the
-message; the sender searches, with the Viterbi algorithm, for the cheapest set
-of ±1 changes that makes H·x equal the message.
 
 ---
 
@@ -208,15 +185,10 @@ the best — strong but expensive).
 (one decision per episode), the simplest RL setting. The multi-step version —
 a warden that collects evidence over many messages — is the planned extension.
 
-**Possible question:** *So RL failed?* — In the first-stage results, yes: the hand-written
-heuristic was best. That is an honest, useful result: it shows (1) carrier
-choice matters, (2) a policy trained against one detector can be exploited by
-another, which is exactly the risk the two-warden design was built to expose.
-The next step is training against an ensemble of detectors.
 
 ---
 
-## 7. What is honest to claim from the first-stage results
+## 7. What is honest to claim from the results
 
 See `docs/SUMMARY.md` (one page) and `docs/RESULTS.md` (all tables).
 Short version: the system works end to end with exact recovery; the experiments

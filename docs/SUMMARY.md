@@ -1,4 +1,4 @@
-# First-stage summary — for the faculty review
+# Summary
 
 **Project:** Reinforcement learning and LLMs for cross-modal steganography.
 One secret is split between an LLM-written paragraph and an RGB photo; a
@@ -77,12 +77,4 @@ a small offline language model (Hugging Face was unreachable on the build machin
   rates; final claims need fresh end-to-end encodes.
 - No robustness to editing or recompression: both carriers are exact-bit schemes.
 
-## Plan after approval
 
-1. Re-run all text experiments with GPT-2 and SmolLM2; scale to more prompts.
-2. Larger cover sets (ALASKA2, DIV2K) and our own detector trained on a free GPU.
-3. RL that cannot hack the reward: train against an ensemble of text and image
-   detectors, select models on a held-out warden, and add the multi-message
-   warden (sequential RL).
-4. Try to remove the tokenisation fingerprint (e.g. allow non-canonical token
-   paths with an ambiguity-aware decoder) and measure whether AUC drops.

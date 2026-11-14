@@ -15,3 +15,5 @@ my_cover.png
 *Zone.Identifier
 demo_out/
 app_out/
+*_images.npz
+*_images.npz
