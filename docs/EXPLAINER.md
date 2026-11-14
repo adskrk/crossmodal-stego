@@ -133,9 +133,11 @@ back as the same token — otherwise the receiver would see different tokens).
    ordinary texts contain a blank line, 4% of stego-texts. With `newline_fix`,
    tokens containing a blank line (or a line break right after another) are left
    out of the alphabet, every line break the stego-text has is shown doubled, and
-   the receiver halves them back before decoding. Measured on GPT-2 at C = 0: the
-   n-gram, likelihood and style detectors went from AUC 0.55 / 0.76 / 0.67 to
-   0.51 / 0.52 / 0.51 (chance), for 2% less capacity. It is on by default in the
+   the receiver halves them back before decoding. Final GPT-2 run at C = 0 (96 test
+   pairs): the white-box detector went from AUC 0.76 to 0.60 (catching 3% at a 5%
+   false-alarm rate, the same as chance) and the style detector from 0.67 to 0.50,
+   for about 1% less capacity. Not perfect: the white-box and n-gram detectors stay
+   just above chance in AUC. It is on by default in the
    system (`SendConfig.newline_fix`); the recorded experiments call it `nlfix`.
 6. **Ending at a sentence.** Hiding stops when the last bit is placed, often
    mid-sentence. After that, the sender keeps writing with ordinary sampling

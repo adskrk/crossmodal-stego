@@ -46,8 +46,8 @@ class SendConfig:
     fill: str = "fast"  # fill-text search: "fast" (sized from measured capacity, 1-3 encodes) or "exact" (bisection)
     aont: bool = True  # seal the secret in an all-or-nothing package before splitting (see aont.py)
     finish_sentence: bool = True  # let the text end at a sentence boundary after the payload
-    # Line-break fix (see TextConfig.newline_fix). Measured on GPT-2 at C = 0 (96 messages, 48 test pairs): it brought
-    # the n-gram, likelihood and style detectors from AUC 0.55 / 0.76 / 0.67 to 0.51 / 0.52 / 0.51.
+    # Line-break fix (see TextConfig.newline_fix). Measured on GPT-2 at C = 0 (192 messages, 96 test pairs): the
+    # white-box likelihood detector went from AUC 0.76 to 0.60 and the style detector from 0.67 to 0.50.
     newline_fix: bool = True
 
 

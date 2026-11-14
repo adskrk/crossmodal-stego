@@ -15,7 +15,7 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 | --- | --- | --- |
 | Lock-box package: secret compressed, locked with a fresh key, key mixed in (Rivest's package transform) | done | either carrier's part alone opens nothing; unit tests |
 | Framing: split, headers, CRC, whitening | done | unit tests |
-| Text channel: arithmetic coding + OD-Stega budget + exact KL, line-break fix, natural sentence ending | done | 288 / 288 GPT-2 stego-texts recovered exactly (1078 / 1078 with the toy model) |
+| Text channel: arithmetic coding + OD-Stega budget + exact KL, line-break fix, natural sentence ending | done | 864 / 864 GPT-2 stego-texts recovered exactly across all runs (1078 / 1078 with the toy model) |
 | Image channel: LSB replacement, LSB matching, HILL + STC on RGB | done | 2135 / 2135 stego images recovered exactly |
 | Sender / receiver, browser app, damage reporting | done | 87 automated tests; JPEG damage reported as "image fragment missing" |
 | Detectors: SPA, 3 pretrained CNNs, SPAM-LR, n-gram, likelihood, style | done | AUC, P_E and detection at 5% false alarms, with 95% intervals |
@@ -34,18 +34,19 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
    carries 29% more (3.08 vs 2.39 bits/token) but the white-box detector
    catches every stego-text (AUC 1.00). The system uses C = 0.
 3. **A structural fingerprint of exact-decoding text steganography, found and
-   fixed.** A detector that knows the model reached AUC 0.76 at C = 0 on GPT-2.
-   Its visible form: **71% of ordinary GPT-2 texts contain a blank line, but only
-   4% of stego-texts.** GPT-2 writes a blank line as one token, and the word after
-   it re-reads as two line breaks plus the word, so exact decoding cannot allow
-   it; stego-text uses single line breaks instead. A style detector with no
-   language model sees this (AUC 0.67). **The fix:** ban blank-line tokens, show
-   every line break doubled, and let the receiver halve them back. Measured on
-   GPT-2 (96 messages, 48 test pairs): n-gram 0.51, **white-box likelihood 0.52**,
-   style 0.51, each catching 4% at a 5% false-alarm rate, i.e. chance, for 2% less
-   capacity (2.35 vs 2.39 bits/token). It is now the default. A weaker trace
-   remains (23 / 96 fixed stego-texts vs 5 / 96 ordinary texts contain a token
-   outside the top 64 when re-read; single-feature AUC 0.59).
+   largely fixed.** A detector that knows the model reached AUC 0.76 at C = 0 on
+   GPT-2. Its visible form: **71% of ordinary GPT-2 texts contain a blank line, but
+   only 4% of stego-texts.** GPT-2 writes a blank line as one token, and the word
+   after it re-reads as two line breaks plus the word, so exact decoding cannot
+   allow it. A style detector with no language model sees this (AUC 0.67). **The
+   fix:** ban blank-line tokens, show every line break doubled, let the receiver
+   halve them back. Final GPT-2 run (192 messages, 96 test pairs): blank lines match
+   (75% vs 71%), style detector 0.50 (chance), **white-box detector 0.60
+   [0.52, 0.69]**, catching 3% of stego-texts at a 5% false-alarm rate (chance
+   level), for about 1% less capacity (2.38 vs 2.39 bits/token). Not perfect: the
+   white-box and n-gram detectors stay just above 0.5 in AUC. A first, smaller run
+   (48 pairs) had suggested 0.52; the larger run is the one to quote. The fix is
+   the default.
 4. **A capacity bug in HILL + STC on real photos, found and fixed.** Photos with
    blown-out or flat regions broke pySTC silently; a per-photo capacity rule plus
    verify-after-embed now refuses such payloads (205 refusals, 0 broken images).
@@ -53,17 +54,19 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
    replacement (AUC up to 0.99) and nothing else. Pretrained CNNs are at chance on
    Kodak but detect HILL on scikit-image photos (AUC 0.61 / 0.70 / 0.81 at 0.05 /
    0.1 / 0.2 bits per value; P_E 0.37 / 0.31 / 0.21).
-6. **Optimising against known detectors overfits them, even several at once.**
-   With GPT-2 text, every search or learned strategy reached about 0% flags under
-   the warden(s) it was tuned on, but none clearly beat *no selection* (21%)
-   under the unseen warden B:
-   - grid search vs warden A: 49%; vs an ensemble of three wardens sharing no
-     detector with B: 47%. Both pick C = 0.1 for about 40% of messages, which
-     black-box detectors partly miss and B's white-box detector always catches;
-   - PPO vs the ensemble: 16% [13%, 18%] on Kodak, the lowest, and 0% on the
-     second photo source. That 0% comes from always choosing one test prompt
-     whose 4 held-out texts B happens not to flag, so it is weak evidence;
-   - the heuristic (busiest photo, highest-entropy prompt, C = 0): 24%.
+6. **Search overfits; one learned policy did not.** First runs (no line-break
+   fix, 4 test texts per prompt): every searched or learned strategy reached about
+   0% flags under the warden(s) it was tuned on, but none clearly beat *no
+   selection* (21%) under the unseen warden B; grid search reached 49%. **Final run**
+   (line-break fix on, 16 texts per prompt):
+   - PPO with the scoring policy, trained only against warden A: A's flag rate
+     0.7% vs 15.5% for no selection; unseen warden B 2.8% vs 4.1% on unseen Kodak
+     photos, and 0.2% vs 7.6% on the unseen photo source; also lower than no
+     selection under wardens C and D, which it never saw. **The first learned policy
+     here that does not overfit its training detector** (one seed so far);
+   - grid search still overfits: 0% under A, 35% under B, mostly by choosing C = 0.1;
+   - PPO trained against the ensemble learned poorly (32% under A);
+   - the heuristic is perfect under B but the worst under A.
 7. **Choosing the split did not help.** With the lock-box, the text share can be
    chosen for detectability alone. Under the unseen warden B the smallest share
    (24-byte fragment, ~81 tokens) had the lowest mean suspicion, 0.69, against
@@ -82,20 +85,22 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 - What this implementation adds: a **text + image** system whose split is
   all-or-nothing, judged by a **pooled warden with independent detector sets**;
   a **simple, measured fix for the blank-line form of the tokenisation
-  fingerprint** that brings a white-box GPT-2 detector from 0.76 to chance at C = 0;
+  fingerprint** that brings a white-box GPT-2 detector from AUC 0.76 to 0.60 at
+  C = 0 (chance-level detection at a 5% false-alarm rate);
   and measurements of failure modes: the clear length field, and proxy-detector
   overfitting of selection policies. Whether these are new to the literature still
   needs a proper search before any claim.
-- The RL contribution is **mostly negative so far, and honestly so**: selection
-  matters, but every strategy tuned on known detectors overfits them, and a learned
-  split does no better than "keep the text short".
+- The RL contribution: search-based selection overfits the detectors it is tuned
+  on, but a PPO scoring policy trained against one warden generalised to three
+  unseen ones in the final run (one seed, to be repeated). A learned split did no
+  better than "keep the text short".
 
 ## Limitations
 
-- Few texts per prompt (4 held-out per prompt and budget in the selection
-  experiments, 2 per prompt at the longer sizes); single lucky prompts can
-  dominate a policy's score, and the split experiment's flag rates are unusable.
-- The selection experiments used stego-texts without the line-break fix.
+- Few texts per prompt in the first selection runs (4 held-out per prompt and
+  budget; 8 in the final run) and at the longer split sizes (2), where the flag
+  rates are unusable.
+- The final PPO result is from one training seed.
 - 256×256 crops from two small photo sources; pretrained CNNs were trained on
   512×512 ALASKA2 photos, so they are mismatched by design.
 - Selection uses cached measurements with linear interpolation between payload

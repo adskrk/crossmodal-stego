@@ -121,8 +121,8 @@ Every part works end to end and is tested, and every number in `docs/RESULTS.md`
 comes from scripts in this repository, but sample sizes are small: 195 photo crops
 and 12 prompts. Start with `docs/SUMMARY.md` (one page) for the findings.
 
-**Exact recovery.** 2135 / 2135 stego images; 288 / 288 GPT-2 stego-texts (and
-1078 / 1078 with the toy model). A further 205 image attempts were refused because
+**Exact recovery.** 2135 / 2135 stego images; 864 / 864 GPT-2 stego-texts across
+all runs, with no encode failures (and 1078 / 1078 with the toy model). A further 205 image attempts were refused because
 the payload exceeded that cover's capacity; these were reported as failures, never
 sent.
 
@@ -137,25 +137,29 @@ sent.
 
 ### Text channel (GPT-2)
 
-Held-out ROC-AUC with 95% intervals, 48 test pairs per row; 0.5 = chance.
+Held-out ROC-AUC with 95% intervals; 0.5 = chance. 48 test pairs per row except the
+final line-break-fix run (96).
 
 | Variant | C | Payload bits / token | N-gram (black box) | Likelihood (white box) | Style (black box) |
 | --- | --- | --- | --- | --- | --- |
 | clear (length field unscrambled) | 0 | 2.42 | 0.99 [0.97, 1.00] | 0.91 [0.84, 0.96] | 0.71 [0.60, 0.80] |
 | filter (+ nonce; final system) | 0 | 2.39 | 0.55 [0.44, 0.66] | 0.76 [0.66, 0.85] | 0.67 [0.57, 0.78] |
 | filter (+ nonce; final system) | 0.1 | 3.08 | 0.64 [0.52, 0.74] | 1.00 [1.00, 1.00] | 0.78 [0.68, 0.87] |
-| **nlfix (+ line-break fix; default now)** | 0 | 2.35 | **0.51 [0.40, 0.63]** | **0.52 [0.39, 0.63]** | **0.51 [0.40, 0.63]** |
+| **nlfix (+ line-break fix; default now)** | 0 | 2.38 | **0.60 [0.52, 0.68]** | **0.60 [0.52, 0.69]** | **0.50 [0.41, 0.57]** |
+| nlfix | 0.1 | 3.06 | 0.70 [0.63, 0.77] | 1.00 [0.99, 1.00] | 0.82 [0.76, 0.87] |
 
 - **Length-field leak, found and fixed.** The nonce and whitening brought the
   n-gram detector from 0.99 to chance level, at the same capacity.
-- **Tokenisation fingerprint, found and fixed.** 71% of ordinary GPT-2 texts
-  contain a blank line but only 4% of stego-texts, because exact decoding cannot
-  allow the blank-line token. With the line-break fix (blank-line tokens banned,
-  line breaks shown doubled and halved again by the receiver) all three detectors,
-  including the white-box one, are at chance (caught at 5% false alarms: 4% each),
-  for 2% less capacity. A weaker trace remains: when re-read, 23 / 96 fixed
-  stego-texts contain a token outside the top 64, versus 5 / 96 ordinary texts
-  (single-feature AUC 0.59).
+- **Tokenisation fingerprint, found and largely fixed.** 71% of ordinary GPT-2
+  texts contain a blank line but only 4% of stego-texts, because exact decoding
+  cannot allow the blank-line token. With the line-break fix (blank-line tokens
+  banned, line breaks shown doubled and halved again by the receiver) blank lines
+  match (75% vs 71%), the style detector is at chance (0.50), and the white-box
+  detector drops from 0.76 to 0.60; at a 5% false-alarm rate it catches 3% of
+  stego-texts, the same as chance. Not perfect: its AUC interval stays above 0.5
+  ([0.52, 0.69]), and the n-gram detector reaches 0.60 too (11% caught at 5% false
+  alarms). A first, smaller run (48 pairs) had suggested 0.52; the larger run is
+  the one to quote.
 - **C = 0.1** buys 29% more capacity but is always caught by the white-box detector.
 
 The toy-model run (more budgets and the retry guard) is in `docs/RESULTS.md`,
@@ -183,6 +187,32 @@ in training; the ensemble is wardens A, C and D (no detector shared with B).
 - **PPO vs the ensemble** has the lowest flag rate under B on Kodak, but part of
   its advantage comes from preferring one test prompt whose few held-out texts B
   does not flag (see `docs/SUMMARY.md`), so this is weak evidence.
+
+**Final selection results (line-break fix on, 4× more texts per prompt).** These
+supersede the table above. Flag rates, 1000 held-out messages per test set:
+
+| Strategy | Tuned against | Unseen Kodak: A | Unseen Kodak: B | Unseen source: A | Unseen source: B |
+| --- | --- | --- | --- | --- | --- |
+| No selection | — | 0.155 | 0.041 | 0.218 | 0.076 |
+| Heuristic | — | 0.279 | 0.000 | 0.284 | 0.000 |
+| Grid search | A | 0.000 | 0.349 | 0.000 | 0.276 |
+| Grid search | ensemble | 0.000 | 0.121 | 0.000 | 0.159 |
+| PPO v1 (slot index) | A | 0.136 | 0.018 | 0.193 | 0.040 |
+| **PPO (scoring policy)** | **A** | **0.007** | **0.028** | **0.012** | **0.002** |
+| PPO (scoring policy) | ensemble | 0.317 | 0.105 | 0.295 | 0.000 |
+
+- **A learned policy that does not overfit.** PPO with the scoring policy, trained
+  only against warden A, cut A's flag rate about 20× and stayed below *no
+  selection* under the unseen warden B on both test sets, and under the ensemble
+  wardens C and D, which it never saw either (0.12 vs 0.22; 0.18 vs 0.29). It
+  always chose C = 0. This is one training run with one seed; repeating it with
+  several seeds is the next check.
+- **Search still overfits.** Grid search reaches 0% on the warden(s) it searches
+  against and is caught 12–35% of the time by warden B, mostly by picking C = 0.1.
+- **PPO trained against the ensemble learned poorly** (worse than no selection under
+  A and the ensemble itself).
+- The heuristic is perfect under B but the worst under A: no fixed rule wins
+  everywhere.
 
 **Choosing the split.** Letting the policy choose how much of the package goes into
 the text (24, 64 or 160 bytes) gave no gain: under the unseen warden B the smallest
@@ -238,10 +268,12 @@ Without internet, `python scripts/make_toy_lm.py` builds a tiny offline model in
 
 - Sample sizes are small: 195 photo crops, 12 prompts, 4 held-out texts per prompt
   and budget in the selection experiments.
-- No selection strategy tuned on known detectors has beaten *no selection* under
-  the unseen warden yet; they overfit the detectors they were tuned on.
-- The line-break fix is measured on 96 messages (48 test pairs); its intervals
-  still reach 0.63, and a weaker re-tokenisation trace remains.
+- Search-based selection overfits the detectors it is tuned on; only the PPO
+  scoring policy generalised, in one run.
+- The line-break fix lowers but does not remove detectability: the white-box and
+  n-gram detectors stay at AUC 0.60 (intervals above 0.5), though at a 5% false-alarm
+  rate they catch 3% and 11%.
+- The PPO result comes from one training seed.
 - The split experiment needs more texts per size before its flag rates mean
   anything.
 - The covers are 256×256 crops from two small photo sources, and the pretrained CNNs
@@ -256,7 +288,7 @@ Without internet, `python scripts/make_toy_lm.py` builds a tiny offline model in
 
 - More held-out texts per prompt and per text size, so selection and split
   results do not hinge on a few texts.
-- Re-run the selection experiments with the line-break fix on.
+- Repeat the PPO training with several seeds.
 - A comparison with another published text coder (e.g. Discop or Meteor).
 - A GPU-trained image detector and a second photo dataset.
 - Speed: reuse measured capacity, and test a faster inference engine.
