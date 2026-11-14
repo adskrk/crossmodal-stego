@@ -50,7 +50,7 @@ def main():
     print(f"\nSENDER  secret: {len(secret)} bytes")
     car = system.send(secret, cover, cfg, model, tok)
     os.makedirs(args.out, exist_ok=True)
-    open(os.path.join(args.out, "stego.txt"), "w").write(car.text)
+    open(os.path.join(args.out, "stego.txt"), "w", encoding="utf-8").write(car.text)
     Image.fromarray(car.image).save(os.path.join(args.out, "stego.png"))
     print(f"  package: {len(secret)}-byte secret sealed into {car.payload_bytes} bytes (all-or-nothing: neither part opens alone)")
     print(f"  text  channel: {car.text_bytes} package bytes in {car.text_stats.tokens} tokens "

@@ -88,11 +88,11 @@ def main():
         del det
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
-    with open(args.out, "w", newline="") as f:
+    with open(args.out, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
-    with open(args.out.replace(".csv", "_refused.csv"), "w", newline="") as f:
+    with open(args.out.replace(".csv", "_refused.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["source", "cover", "texture", "method", "rate", "status"])
         w.writeheader()
         w.writerows(refused)

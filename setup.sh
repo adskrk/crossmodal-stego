@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-time setup on a Linux/macOS laptop (Python 3.10+, internet access).
-# Windows: run the same commands in WSL, or adapt them in PowerShell.
+# Windows: double-click setup_windows.bat instead.
 set -euo pipefail
 cd "$(dirname "$0")"
 

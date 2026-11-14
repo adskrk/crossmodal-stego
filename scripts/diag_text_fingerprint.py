@@ -34,7 +34,7 @@ def main():
     ap.add_argument("--C", type=float, default=0.0)
     args = ap.parse_args()
     model, tok = tc.load_lm(args.model)
-    S = [json.loads(l) for l in open(f"results/text_{args.variant}_samples.jsonl")]
+    S = [json.loads(l) for l in open(f"results/text_{args.variant}_samples.jsonl", encoding="utf-8")]
     S = [s for s in S if s["C"] == args.C]
     Fc = np.array([likelihood_features([s["cover"]], s["prompt"], model, tok)[0] for s in S])
     Fs = np.array([likelihood_features([s["stego"]], s["prompt"], model, tok)[0] for s in S])
@@ -46,7 +46,7 @@ def main():
                      "single_feature_auc": max(a, 1 - a)})
     rows.append({"feature": "texts with >=1 token outside top-k", "cover_mean": int((Fc[:, 4] > 0).sum()),
                  "stego_mean": int((Fs[:, 4] > 0).sum()), "single_feature_auc": len(S)})
-    with open("results/text_fingerprint.csv", "w", newline="") as f:
+    with open("results/text_fingerprint.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)

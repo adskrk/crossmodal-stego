@@ -82,15 +82,15 @@ def main():
         print(f"C={C}: done ({time.time()-t0:.0f}s)", flush=True)
 
     os.makedirs(args.out, exist_ok=True)
-    with open(os.path.join(args.out, tag + "samples.jsonl"), "w") as f:
+    with open(os.path.join(args.out, tag + "samples.jsonl"), "w", encoding="utf-8") as f:
         for s in samples:
             f.write(json.dumps(s) + "\n")
-    with open(os.path.join(args.out, tag + "measurements.csv"), "w", newline="") as f:
+    with open(os.path.join(args.out, tag + "measurements.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(meas[0].keys()))
         w.writeheader()
         w.writerows(meas)
 
-    with open(os.path.join(args.out, tag + "encode_failures.csv"), "w", newline="") as f:
+    with open(os.path.join(args.out, tag + "encode_failures.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["C", "prompt_id", "j", "reason"])
         w.writeheader()
         w.writerows(failures)
@@ -118,11 +118,11 @@ def main():
                 score_rows.append({"C": C, "detector": name, "prompt": s["prompt"], "j": s["j"],
                                    "cover_score": float(a), "stego_score": float(b)})
             print(f"C={C} {name}: AUC {det_rows[-1]['auc']:.3f} on {len(te)} held-out pairs", flush=True)
-    with open(os.path.join(args.out, tag + "detection.csv"), "w", newline="") as f:
+    with open(os.path.join(args.out, tag + "detection.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(det_rows[0].keys()))
         w.writeheader()
         w.writerows(det_rows)
-    with open(os.path.join(args.out, tag + "heldout_scores.csv"), "w", newline="") as f:
+    with open(os.path.join(args.out, tag + "heldout_scores.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(score_rows[0].keys()))
         w.writeheader()
         w.writerows(score_rows)

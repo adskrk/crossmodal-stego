@@ -21,7 +21,7 @@ def main():
     ap.add_argument("--per-c", type=int, default=48)
     args = ap.parse_args()
     model, tok = tc.load_lm(args.model)
-    samples = [json.loads(l) for l in open("results/text_samples.jsonl")]
+    samples = [json.loads(l) for l in open("results/text_samples.jsonl", encoding="utf-8")]
     taken = defaultdict(int)
     rows = []
     for s in samples:
@@ -31,7 +31,7 @@ def main():
         cfg = tc.TextConfig(args.model, s["prompt"], C=s["C"], max_new_tokens=None)
         _, st = tc.decode_with_stats(s["stego"], cfg, model, tok)
         rows.append({"C": s["C"], "prompt": s["prompt"], "j": s["j"], **st})
-    with open("results/text_kl.csv", "w", newline="") as f:
+    with open("results/text_kl.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)

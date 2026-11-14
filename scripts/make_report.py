@@ -262,7 +262,7 @@ def text_section(lines):
 
 
 def selection_section(lines):
-    s = json.load(open(os.path.join(R, "selection_summary.json")))
+    s = json.load(open(os.path.join(R, "selection_summary.json"), encoding="utf-8"))
     df = pd.DataFrame(s["summary"])
     lines += ["## 3. Carrier selection with a pooled warden", ""]
     lines.append(f"Text measurements from the `{s.get('text_variant','text_filter_').strip('_').replace('text_','')}` variant (C ∈ {s['C_values']}). "
@@ -318,7 +318,7 @@ def main():
     text_section(lines)
     if os.path.exists(os.path.join(R, "selection_summary.json")):
         selection_section(lines)
-    open(os.path.join(D, "RESULTS.md"), "w").write("\n".join(lines) + "\n")
+    open(os.path.join(D, "RESULTS.md"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print("wrote docs/RESULTS.md")
 
 

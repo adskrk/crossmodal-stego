@@ -138,5 +138,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="gpt2")
     ap.add_argument("--port", type=int, default=7860)
+    ap.add_argument("--open", action="store_true", help="open the app in the default browser once it is ready")
     args = ap.parse_args()
-    build(args.model).launch(server_name="127.0.0.1", server_port=args.port)
+    build(args.model).launch(server_name="127.0.0.1", server_port=args.port, inbrowser=args.open)

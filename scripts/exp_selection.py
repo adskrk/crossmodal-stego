@@ -109,7 +109,7 @@ def main():
     out = {"text_variant": args.text_tag, "episodes_per_split": args.episodes, "ppo_steps": args.ppo_steps, "ppo_train_seconds": ppo_train_s, "ppo_score_train_seconds": ppo2_train_s,
            "message_bytes": P.MESSAGE_BYTES, "K_covers": 8, "M_prompts": 4, "C_values": P.C_VALUES,
            "summary": summary}
-    with open(os.path.join(args.results, "selection_summary.json"), "w") as f:
+    with open(os.path.join(args.results, "selection_summary.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
     print(pd.DataFrame(summary)[["split", "strategy", "warden", "mean_suspicion", "flag_rate",
                                  "evaluations_per_message", "share_C>0"]].round(3).to_string(index=False))

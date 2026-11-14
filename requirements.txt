@@ -1,9 +1,14 @@
 # Pinned to the versions this implementation was built and tested with.
-# torch is installed separately by setup.sh (CPU wheel).
+# torch is installed separately by setup.sh / setup_windows.bat (CPU wheel).
+# Windows uses Python 3.11, because the prebuilt pySTC wheel (pystcstego) exists
+# only for 3.11 there; numpy and scipy 3.11 builds are pinned for it. HILL+STC
+# output was checked to be byte-identical across the two numpy/scipy pairs.
 transformers==5.22.2
 subtext-codec==1.1.0
-numpy==2.5.3
-scipy==1.18.1
+numpy==2.5.3; python_version >= "3.12"
+numpy==2.4.6; python_version < "3.12"
+scipy==1.18.1; python_version >= "3.12"
+scipy==1.17.1; python_version < "3.12"
 pillow==12.3.0
 scikit-image==0.26.0
 scikit-learn==1.9.1
@@ -18,3 +23,4 @@ gradio==6.31.0
 reedsolo
 psutil
 pytest
+pystcstego==0.1.0; sys_platform == "win32"  # prebuilt pySTC for Windows; Linux builds it from source (setup.sh)

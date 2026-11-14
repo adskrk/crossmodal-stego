@@ -36,6 +36,24 @@ selection) is compared across simple baselines and PPO.
 
 ## Setup
 
+### Windows (no WSL needed)
+
+1. Install **Python 3.11** from
+   [python.org](https://www.python.org/downloads/release/python-3119/)
+   ("Windows installer (64-bit)"); keep "py launcher" ticked. Windows uses 3.11
+   because the prebuilt pySTC library exists only for that version.
+2. Install [Git for Windows](https://git-scm.com/download/win) if you do not have it.
+3. Clone this repository into a normal folder (not OneDrive), e.g.
+   `C:\Users\<you>\Projects\crossmodal-stego`.
+4. Double-click **`setup_windows.bat`** (20-40 minutes, downloads about 1.5 GB).
+5. Double-click **`run_tests.bat`**: it should end with "passed".
+6. Double-click **`run_app.bat`**: the browser demo opens by itself.
+
+To run a script by hand, open a terminal in the project folder and use
+`.venv\Scripts\python.exe`, e.g. `.venv\Scripts\python.exe scripts\demo.py --model gpt2`.
+
+### Linux / macOS / WSL
+
 ```bash
 ./setup.sh                          # venv, libraries, pySTC, Aletheia models, Kodak covers, GPT-2
 source .venv/bin/activate
@@ -78,7 +96,8 @@ python scripts/demo.py --model gpt2 --attack jpeg   # re-saves the image as JPEG
 python scripts/demo.py --model gpt2 --attack edit   # changes one word of the text: text fragment lost
 ```
 
-**Browser app.** Runs the same hide and extract steps in a browser:
+**Browser app.** Runs the same hide and extract steps in a browser (on Windows,
+just double-click `run_app.bat`):
 
 ```bash
 python scripts/app.py --model gpt2
