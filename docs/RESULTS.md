@@ -127,7 +127,7 @@ Variants: **clear** = subtext-codec framing as-is (length field in clear), filte
 
 ### What the white-box detector sees at C = 0 (filter variant)
 
-The single most informative feature is *std log-prob* (single-feature AUC 0.72, close to the full detector). When the text is re-read by the tokenizer, 4 of 96 ordinary samples contain at least one token outside the model's top 64, versus 0 of 96 stego-texts. Ordinary sampling sometimes picks token pairs that merge into a different tokenisation; exact-decoding stego-text never can, under either guard. This is why the retry guard did not lower detectability.
+The single most informative feature is *std log-prob* (single-feature AUC 0.72, close to the full detector). When the text is re-read by the tokenizer, 4 of 96 ordinary samples contain at least one token outside the model's top 64, versus 0 of 96 stego-texts. Ordinary sampling sometimes picks token pairs that merge into a different tokenisation; exact-decoding stego-text never can.
 
 Texts with a blank line in this run: 68 of 96 ordinary, 4 of 96 stego.
 
@@ -285,27 +285,37 @@ Overfitting to one warden was the main weakness found in section 3, so the same 
 
 Text fragment sizes measured on GPT-2 at C = 0: 24 bytes ≈ 81 tokens, 64 bytes ≈ 173 tokens, 160 bytes ≈ 409 tokens. Secrets of [64, 256, 1024, 4096] bytes, 1000 held-out messages per test set. Each strategy picks a cover, a prompt and a text size; the image carries the rest of the package.
 
+**Read the flag rates with care.** A text p-value is computed against the ordinary texts of the same size: 24 bytes: 48 texts, smallest possible p = 0.020; 64 bytes: 24 texts, smallest possible p = 0.040; 160 bytes: 24 texts, smallest possible p = 0.040. The text eye flags only below 0.025, so wherever the smallest possible p is above that, the text can never be flagged and the flag rate measures the image alone. Mean suspicion (1 − smallest p) is compared instead; its ceiling is slightly *higher* for the 24-byte size, which biases it against the small text share, not for it.
+
 ### Unseen Kodak photos + unseen prompts
 
-| Strategy | Flag rate, A | Flag rate, ENS | Flag rate, B | Text sizes chosen |
-| --- | --- | --- | --- | --- |
-| Smallest text share | 0.00 [0.00, 0.00] | 0.00 [0.00, 0.00] | 0.26 [0.23, 0.29] | 24 B: 100% |
-| Largest text share | 0.00 [0.00, 0.00] | 0.00 [0.00, 0.00] | 0.00 [0.00, 0.00] | 160 B: 100% |
-| Random | 0.01 [0.01, 0.02] | 0.06 [0.04, 0.07] | 0.11 [0.09, 0.13] | 24 B: 33%, 64 B: 31%, 160 B: 35% |
-| Grid search (vs A) | 0.00 [0.00, 0.00] | 0.01 [0.01, 0.02] | 0.01 [0.01, 0.02] | 24 B: 35%, 64 B: 24%, 160 B: 42% |
-| Grid search (vs ensemble) | 0.00 [0.00, 0.00] | 0.00 [0.00, 0.00] | 0.02 [0.01, 0.03] | 24 B: 33%, 64 B: 1%, 160 B: 66% |
-| PPO (vs A) | 0.00 [0.00, 0.00] | 0.11 [0.09, 0.13] | 0.04 [0.03, 0.05] | 64 B: 100% |
-| PPO (vs ensemble) | 0.01 [0.00, 0.02] | 0.06 [0.05, 0.08] | 0.14 [0.12, 0.17] | 160 B: 100% |
+| Strategy | Suspicion, A | Suspicion, ENS | Suspicion, B | Flag rate, B | Text sizes chosen |
+| --- | --- | --- | --- | --- | --- |
+| Smallest text share | 0.55 [0.54, 0.56] | 0.87 [0.86, 0.87] | 0.69 [0.68, 0.71] | 0.26 | 24 B: 100% |
+| Largest text share | 0.58 [0.57, 0.59] | 0.82 [0.82, 0.83] | 0.88 [0.88, 0.88] | 0.00 | 160 B: 100% |
+| Random | 0.63 [0.61, 0.64] | 0.82 [0.82, 0.83] | 0.85 [0.85, 0.86] | 0.11 | 24 B: 33%, 64 B: 31%, 160 B: 35% |
+| Grid search (vs A) | 0.10 [0.09, 0.10] | 0.81 [0.80, 0.82] | 0.85 [0.84, 0.85] | 0.01 | 24 B: 35%, 64 B: 24%, 160 B: 42% |
+| Grid search (vs ensemble) | 0.43 [0.42, 0.43] | 0.51 [0.50, 0.52] | 0.83 [0.82, 0.84] | 0.02 | 24 B: 33%, 64 B: 1%, 160 B: 66% |
+| PPO (vs A) | 0.63 [0.61, 0.65] | 0.89 [0.89, 0.89] | 0.84 [0.83, 0.84] | 0.04 | 64 B: 100% |
+| PPO (vs ensemble) | 0.54 [0.53, 0.56] | 0.71 [0.70, 0.72] | 0.88 [0.88, 0.89] | 0.14 | 160 B: 100% |
 
 ### Unseen image source + unseen prompts
 
-| Strategy | Flag rate, A | Flag rate, ENS | Flag rate, B | Text sizes chosen |
-| --- | --- | --- | --- | --- |
-| Smallest text share | 0.01 [0.01, 0.02] | 0.19 [0.17, 0.22] | 0.26 [0.23, 0.29] | 24 B: 100% |
-| Largest text share | 0.01 [0.01, 0.02] | 0.19 [0.17, 0.22] | 0.00 [0.00, 0.00] | 160 B: 100% |
-| Random | 0.08 [0.06, 0.09] | 0.13 [0.11, 0.15] | 0.10 [0.09, 0.12] | 24 B: 33%, 64 B: 31%, 160 B: 35% |
-| Grid search (vs A) | 0.00 [0.00, 0.00] | 0.05 [0.04, 0.07] | 0.11 [0.09, 0.13] | 24 B: 43%, 64 B: 22%, 160 B: 35% |
-| Grid search (vs ensemble) | 0.00 [0.00, 0.00] | 0.00 [0.00, 0.00] | 0.05 [0.04, 0.06] | 24 B: 38%, 64 B: 3%, 160 B: 59% |
-| PPO (vs A) | 0.01 [0.01, 0.02] | 0.19 [0.17, 0.22] | 0.00 [0.00, 0.00] | 64 B: 100% |
-| PPO (vs ensemble) | 0.01 [0.00, 0.01] | 0.21 [0.19, 0.24] | 0.00 [0.00, 0.00] | 160 B: 100% |
+| Strategy | Suspicion, A | Suspicion, ENS | Suspicion, B | Flag rate, B | Text sizes chosen |
+| --- | --- | --- | --- | --- | --- |
+| Smallest text share | 0.85 [0.85, 0.86] | 0.91 [0.90, 0.91] | 0.68 [0.66, 0.69] | 0.26 | 24 B: 100% |
+| Largest text share | 0.85 [0.85, 0.86] | 0.88 [0.88, 0.88] | 0.88 [0.88, 0.88] | 0.00 | 160 B: 100% |
+| Random | 0.85 [0.84, 0.85] | 0.89 [0.88, 0.89] | 0.82 [0.81, 0.83] | 0.10 | 24 B: 33%, 64 B: 31%, 160 B: 35% |
+| Grid search (vs A) | 0.44 [0.42, 0.45] | 0.76 [0.76, 0.77] | 0.81 [0.80, 0.82] | 0.11 | 24 B: 43%, 64 B: 22%, 160 B: 35% |
+| Grid search (vs ensemble) | 0.55 [0.54, 0.56] | 0.60 [0.59, 0.61] | 0.79 [0.78, 0.81] | 0.05 | 24 B: 38%, 64 B: 3%, 160 B: 59% |
+| PPO (vs A) | 0.87 [0.86, 0.87] | 0.89 [0.89, 0.90] | 0.78 [0.78, 0.79] | 0.00 | 64 B: 100% |
+| PPO (vs ensemble) | 0.79 [0.78, 0.80] | 0.84 [0.83, 0.85] | 0.82 [0.82, 0.83] | 0.00 | 160 B: 100% |
+
+**Text detectability by length** (held-out ROC-AUC, C = 0, without the line-break fix):
+
+| Text fragment (bytes) | Tokens | N-gram | Likelihood | Style | Test pairs |
+| --- | --- | --- | --- | --- | --- |
+| 24 | 81 | 0.55 [0.44, 0.66] | 0.76 [0.66, 0.85] | 0.67 [0.57, 0.78] | 48 |
+| 64 | 173 | 0.54 [0.38, 0.69] | 0.82 [0.69, 0.94] | 0.75 [0.60, 0.89] | 24 |
+| 160 | 409 | 0.50 [0.32, 0.67] | 0.81 [0.68, 0.93] | 0.71 [0.56, 0.85] | 24 |
 

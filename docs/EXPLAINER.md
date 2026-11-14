@@ -133,9 +133,10 @@ back as the same token — otherwise the receiver would see different tokens).
    ordinary texts contain a blank line, 4% of stego-texts. With `newline_fix`,
    tokens containing a blank line (or a line break right after another) are left
    out of the alphabet, every line break the stego-text has is shown doubled, and
-   the receiver halves them back before decoding. Exact on the toy model; its
-   effect on GPT-2 detectability is measured by `run_overnight.bat`. Off by default
-   until then.
+   the receiver halves them back before decoding. Measured on GPT-2 at C = 0: the
+   n-gram, likelihood and style detectors went from AUC 0.55 / 0.76 / 0.67 to
+   0.51 / 0.52 / 0.51 (chance), for 2% less capacity. It is on by default in the
+   system (`SendConfig.newline_fix`); the recorded experiments call it `nlfix`.
 6. **Ending at a sentence.** Hiding stops when the last bit is placed, often
    mid-sentence. After that, the sender keeps writing with ordinary sampling
    until a sentence ends (at most 40 tokens). The receiver stops reading once it
@@ -254,8 +255,11 @@ the lowest flag rate under B, partly by preferring one lucky test prompt.
 any split is equally safe for confidentiality, so the text share can be chosen for
 detectability alone: a longer text gives text detectors more to work with, a
 smaller image payload gives image detectors less. The policy picks a cover, a
-prompt and a text size from measured sizes (24, 64, 160 bytes). Its GPT-2
-measurements come from `run_overnight.bat`.
+prompt and a text size from measured sizes (24, 64, 160 bytes). Result on GPT-2:
+no gain. Under the unseen warden the smallest text share was least suspicious,
+and searched or learned policies that picked longer texts were more suspicious.
+With only 24 calibration texts at the longer sizes, flag rates could not be used
+(the smallest possible p-value is above the threshold); mean suspicion was.
 
 ---
 

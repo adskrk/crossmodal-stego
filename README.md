@@ -144,13 +144,18 @@ Held-out ROC-AUC with 95% intervals, 48 test pairs per row; 0.5 = chance.
 | clear (length field unscrambled) | 0 | 2.42 | 0.99 [0.97, 1.00] | 0.91 [0.84, 0.96] | 0.71 [0.60, 0.80] |
 | filter (+ nonce; final system) | 0 | 2.39 | 0.55 [0.44, 0.66] | 0.76 [0.66, 0.85] | 0.67 [0.57, 0.78] |
 | filter (+ nonce; final system) | 0.1 | 3.08 | 0.64 [0.52, 0.74] | 1.00 [1.00, 1.00] | 0.78 [0.68, 0.87] |
+| **nlfix (+ line-break fix; default now)** | 0 | 2.35 | **0.51 [0.40, 0.63]** | **0.52 [0.39, 0.63]** | **0.51 [0.40, 0.63]** |
 
 - **Length-field leak, found and fixed.** The nonce and whitening brought the
   n-gram detector from 0.99 to chance level, at the same capacity.
-- **Tokenisation fingerprint, still present.** 71% of ordinary GPT-2 texts contain
-  a blank line, only 4% of stego-texts, because exact decoding cannot allow the
-  blank-line token. The style detector sees this; a fix (`newline_fix`) is built
-  and being measured on GPT-2.
+- **Tokenisation fingerprint, found and fixed.** 71% of ordinary GPT-2 texts
+  contain a blank line but only 4% of stego-texts, because exact decoding cannot
+  allow the blank-line token. With the line-break fix (blank-line tokens banned,
+  line breaks shown doubled and halved again by the receiver) all three detectors,
+  including the white-box one, are at chance (caught at 5% false alarms: 4% each),
+  for 2% less capacity. A weaker trace remains: when re-read, 23 / 96 fixed
+  stego-texts contain a token outside the top 64, versus 5 / 96 ordinary texts
+  (single-feature AUC 0.59).
 - **C = 0.1** buys 29% more capacity but is always caught by the white-box detector.
 
 The toy-model run (more budgets and the retry guard) is in `docs/RESULTS.md`,
@@ -178,6 +183,14 @@ in training; the ensemble is wardens A, C and D (no detector shared with B).
 - **PPO vs the ensemble** has the lowest flag rate under B on Kodak, but part of
   its advantage comes from preferring one test prompt whose few held-out texts B
   does not flag (see `docs/SUMMARY.md`), so this is weak evidence.
+
+**Choosing the split.** Letting the policy choose how much of the package goes into
+the text (24, 64 or 160 bytes) gave no gain: under the unseen warden B the smallest
+text share had the lowest mean suspicion (0.69 vs 0.83–0.88 for every strategy that
+chose longer texts), and longer texts are slightly more detectable to the white-box
+detector (AUC 0.76 at 81 tokens, 0.81–0.82 at 173–409). Flag rates from this
+experiment are not usable: with 24 calibration texts the smallest possible p-value
+(0.04) is above the flag threshold (see `docs/RESULTS.md`, section 5).
 
 ### Speed (GPT-2, laptop CPU, `scripts/bench_send.py`)
 
@@ -225,8 +238,10 @@ Without internet, `python scripts/make_toy_lm.py` builds a tiny offline model in
   and budget in the selection experiments.
 - No selection strategy tuned on known detectors has beaten *no selection* under
   the unseen warden yet; they overfit the detectors they were tuned on.
-- The tokenisation fingerprint remains in the default system (blank lines); the
-  fix is built but not yet measured on GPT-2.
+- The line-break fix is measured on 96 messages (48 test pairs); its intervals
+  still reach 0.63, and a weaker re-tokenisation trace remains.
+- The split experiment needs more texts per size before its flag rates mean
+  anything.
 - The covers are 256×256 crops from two small photo sources, and the pretrained CNNs
   are mismatched with them by design.
 - Selection uses cached measurements with linear interpolation between payload
@@ -237,9 +252,9 @@ Without internet, `python scripts/make_toy_lm.py` builds a tiny offline model in
 
 **Next steps**
 
-- GPT-2 measurements of the line-break fix and of the split choice
-  (`run_overnight.bat`).
-- More held-out texts per prompt, so selection results do not hinge on a few texts.
+- More held-out texts per prompt and per text size, so selection and split
+  results do not hinge on a few texts.
+- Re-run the selection experiments with the line-break fix on.
 - A comparison with another published text coder (e.g. Discop or Meteor).
 - A GPU-trained image detector and a second photo dataset.
 - Speed: reuse measured capacity, and test a faster inference engine.

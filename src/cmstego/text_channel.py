@@ -90,7 +90,8 @@ class TextConfig:
     # word after it re-reads as "\n", "\n", word and the stability filter
     # rejects that. With the fix, tokens containing "\n\n" are left out of the
     # alphabet, every line break of the stego-text is shown doubled, and the
-    # receiver halves them again before decoding. Off by default (experiments).
+    # receiver halves them again before decoding. Off here so the recorded
+    # experiments stay reproducible; system.send turns it on (measured on GPT-2).
     newline_fix: bool = False
 
 

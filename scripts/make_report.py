@@ -344,8 +344,9 @@ def text_section(lines, rdir=R, title="## 2. Text channel", fig_name="text_detec
                   "close to the full detector). When the text is re-read by the tokenizer, "
                   f"{int(cnt.cover_mean)} of {int(cnt.single_feature_auc)} ordinary samples contain at least one token outside the model's top 64, "
                   f"versus {int(cnt.stego_mean)} of {int(cnt.single_feature_auc)} stego-texts. Ordinary sampling sometimes picks token pairs "
-                  "that merge into a different tokenisation; exact-decoding stego-text never can, under either guard. "
-                  "This is why the retry guard did not lower detectability.", ""]
+                  "that merge into a different tokenisation; exact-decoding stego-text never can"
+                  + (", under either guard. This is why the retry guard did not lower detectability."
+                     if os.path.exists(os.path.join(rdir, "text_retry_measurements.csv")) else "."), ""]
         if "texts with a blank line" in counts.index:
             bl = counts.loc["texts with a blank line"]
             lines += [f"Texts with a blank line in this run: {int(bl.cover_mean)} of {int(bl.single_feature_auc)} ordinary, "
@@ -447,20 +448,49 @@ def split_section(lines, rdir):
               f"Text fragment sizes measured on GPT-2 at C = 0: {toks}. Secrets of {s['message_bytes']} bytes, "
               f"{s['episodes_per_split']} held-out messages per test set. Each strategy picks a cover, a prompt and a text size; "
               "the image carries the rest of the package.", ""]
+    # How fine-grained can a text p-value be at each size?
+    res = []
+    for size, folder in s["size_dirs"].items():
+        h = pd.read_csv(os.path.join(folder.replace("\\", "/"), "text_filter_heldout_scores.csv"))
+        n = int((h[np.isclose(h.C, 0)].detector == "likelihood").sum())
+        res.append((int(size), n, 1 / (n + 1)))
+    lines += ["**Read the flag rates with care.** A text p-value is computed against the ordinary texts of the same size: "
+              + "; ".join(f"{sz} bytes: {n} texts, smallest possible p = {pmin:.3f}" for sz, n, pmin in res)
+              + ". The text eye flags only below 0.025, so wherever the smallest possible p is above that, the text can "
+              "never be flagged and the flag rate measures the image alone. Mean suspicion (1 − smallest p) is "
+              "compared instead; its ceiling is slightly *higher* for the 24-byte size, which biases it against the "
+              "small text share, not for it.", ""]
     names = {"min-text": "Smallest text share", "max-text": "Largest text share", "random": "Random",
              "grid-A": "Grid search (vs A)", "grid-ens": "Grid search (vs ensemble)", "ppo-A": "PPO (vs A)",
              "ppo-ens": "PPO (vs ensemble)"}
     ws = [w for w in ("A", "ENS", "B") if w in s["wardens"]]
     for split, label in (("test", "Unseen Kodak photos + unseen prompts"), ("test_B", "Unseen image source + unseen prompts")):
-        lines += [f"### {label}", "", "| Strategy | " + " | ".join(f"Flag rate, {w}" for w in ws) + " | Text sizes chosen |",
-                  "| --- | " + " | ".join("---" for _ in ws) + " | --- |"]
+        lines += [f"### {label}", "", "| Strategy | " + " | ".join(f"Suspicion, {w}" for w in ws)
+                  + " | Flag rate, B | Text sizes chosen |", "| --- | " + " | ".join("---" for _ in ws) + " | --- | --- |"]
         for st in [n for n in names if n in set(df.strategy)]:
             g = df[(df.split == split) & (df.strategy == st)].set_index("warden")
             share = g.iloc[0]["size_share"]
             share_txt = ", ".join(f"{k} B: {100*v:.0f}%" for k, v in sorted(share.items(), key=lambda kv: int(kv[0])))
-            lines.append(f"| {names[st]} | " + " | ".join(fmt_ci(g.loc[w, 'flag_rate'], *g.loc[w, 'flag_ci']) for w in ws)
-                         + f" | {share_txt} |")
+            lines.append(f"| {names[st]} | " + " | ".join(fmt_ci(g.loc[w, 'mean_suspicion'], *g.loc[w, 'susp_ci']) for w in ws)
+                         + f" | {g.loc['B', 'flag_rate']:.2f} | {share_txt} |")
         lines.append("")
+    # Direct evidence: detector AUC by text size (same detectors, C = 0).
+    rows = []
+    for size, folder in s["size_dirs"].items():
+        f = folder.replace("\\", "/")
+        h = pd.read_csv(os.path.join(f, "text_filter_heldout_scores.csv"))
+        sp = os.path.join(f, "text_filter_heldout_scores_style.csv")
+        if os.path.exists(sp):
+            h = pd.concat([h, pd.read_csv(sp)], ignore_index=True)
+        h = h[np.isclose(h.C, 0)]
+        cells = []
+        for det in ("ngram", "likelihood", "style"):
+            g = h[h.detector == det]
+            cells.append(fmt_ci(*auc_ci(g.cover_score, g.stego_score)) if len(g) else "—")
+        rows.append(f"| {size} | {s['mean_tokens'][size]:.0f} | " + " | ".join(cells) + f" | {len(h[h.detector == 'ngram'])} |")
+    lines += ["**Text detectability by length** (held-out ROC-AUC, C = 0, without the line-break fix):", "",
+              "| Text fragment (bytes) | Tokens | N-gram | Likelihood | Style | Test pairs |", "| --- | --- | --- | --- | --- | --- |"]
+    lines += rows + [""]
 
 
 G = "results_gpt2"

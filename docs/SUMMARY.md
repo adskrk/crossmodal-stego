@@ -15,7 +15,7 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 | --- | --- | --- |
 | Lock-box package: secret compressed, locked with a fresh key, key mixed in (Rivest's package transform) | done | either carrier's part alone opens nothing; unit tests |
 | Framing: split, headers, CRC, whitening | done | unit tests |
-| Text channel: arithmetic coding + OD-Stega budget + exact KL, natural sentence ending | done | 288 / 288 GPT-2 stego-texts recovered exactly (1078 / 1078 with the toy model) |
+| Text channel: arithmetic coding + OD-Stega budget + exact KL, line-break fix, natural sentence ending | done | 288 / 288 GPT-2 stego-texts recovered exactly (1078 / 1078 with the toy model) |
 | Image channel: LSB replacement, LSB matching, HILL + STC on RGB | done | 2135 / 2135 stego images recovered exactly |
 | Sender / receiver, browser app, damage reporting | done | 87 automated tests; JPEG damage reported as "image fragment missing" |
 | Detectors: SPA, 3 pretrained CNNs, SPAM-LR, n-gram, likelihood, style | done | AUC, P_E and detection at 5% false alarms, with 95% intervals |
@@ -33,17 +33,19 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 2. **The OD-Stega budget trades capacity for detectability.** On GPT-2, C = 0.1
    carries 29% more (3.08 vs 2.39 bits/token) but the white-box detector
    catches every stego-text (AUC 1.00). The system uses C = 0.
-3. **A structural fingerprint of exact-decoding text steganography.** A detector
-   that knows the model still reaches AUC 0.76 at C = 0 on GPT-2 (0.71 on the
-   toy model). Its visible form: **71% of ordinary GPT-2 texts contain a blank
-   line, but only 4% of stego-texts**. GPT-2 writes a blank line as one token,
-   and the word after it re-reads as two line breaks plus the word; exact
-   decoding cannot allow that, so stego-text uses single line breaks. A simple
-   style detector with no language model sees this (AUC 0.67 [0.57, 0.78]); the
-   n-gram detector, which ignores line breaks, does not. **A fix is built**
-   (blank-line tokens banned, line breaks shown doubled and halved again by the
-   receiver; exact on the toy model) and its GPT-2 measurement is in the
-   overnight run.
+3. **A structural fingerprint of exact-decoding text steganography, found and
+   fixed.** A detector that knows the model reached AUC 0.76 at C = 0 on GPT-2.
+   Its visible form: **71% of ordinary GPT-2 texts contain a blank line, but only
+   4% of stego-texts.** GPT-2 writes a blank line as one token, and the word after
+   it re-reads as two line breaks plus the word, so exact decoding cannot allow
+   it; stego-text uses single line breaks instead. A style detector with no
+   language model sees this (AUC 0.67). **The fix:** ban blank-line tokens, show
+   every line break doubled, and let the receiver halve them back. Measured on
+   GPT-2 (96 messages, 48 test pairs): n-gram 0.51, **white-box likelihood 0.52**,
+   style 0.51, each catching 4% at a 5% false-alarm rate, i.e. chance, for 2% less
+   capacity (2.35 vs 2.39 bits/token). It is now the default. A weaker trace
+   remains (23 / 96 fixed stego-texts vs 5 / 96 ordinary texts contain a token
+   outside the top 64 when re-read; single-feature AUC 0.59).
 4. **A capacity bug in HILL + STC on real photos, found and fixed.** Photos with
    blown-out or flat regions broke pySTC silently; a per-photo capacity rule plus
    verify-after-embed now refuses such payloads (205 refusals, 0 broken images).
@@ -62,7 +64,14 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
      second photo source. That 0% comes from always choosing one test prompt
      whose 4 held-out texts B happens not to flag, so it is weak evidence;
    - the heuristic (busiest photo, highest-entropy prompt, C = 0): 24%.
-7. **Speed.** Sizing the text from the coder's measured capacity instead of a
+7. **Choosing the split did not help.** With the lock-box, the text share can be
+   chosen for detectability alone. Under the unseen warden B the smallest share
+   (24-byte fragment, ~81 tokens) had the lowest mean suspicion, 0.69, against
+   0.83–0.88 for every strategy (grid search, PPO) that picked longer texts; longer
+   texts are slightly more detectable (white-box AUC 0.76 → 0.81–0.82). The
+   experiment's flag rates are unusable because 24 calibration texts cannot give a
+   p-value below the threshold. The supported rule is simply: keep the text short.
+8. **Speed.** Sizing the text from the coder's measured capacity instead of a
    bisection cut sending time about 5× on GPT-2 (1,000-byte secret: 93 s → 16 s;
    one line: 51 s → 10 s), measured with `scripts/bench_send.py` on the laptop.
 
@@ -71,19 +80,22 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 - Splitting a secret across carriers is **not** new (batch steganography,
   multimodal allocation papers), and the package transform is Rivest's (1997).
 - What this implementation adds: a **text + image** system whose split is
-  all-or-nothing, judged by a **pooled warden with independent detector sets**,
-  and measurements of concrete failure modes: the clear length field, the
-  tokenisation fingerprint and its blank-line form, and proxy-detector
-  overfitting of selection policies. Whether these are new to the literature
-  still needs a proper search before any claim.
-- The RL contribution is **open**: selection matters, but every strategy tuned
-  on known detectors so far overfits them. Letting RL choose the split is built
-  and waits for its GPT-2 measurements.
+  all-or-nothing, judged by a **pooled warden with independent detector sets**;
+  a **simple, measured fix for the blank-line form of the tokenisation
+  fingerprint** that brings a white-box GPT-2 detector from 0.76 to chance at C = 0;
+  and measurements of failure modes: the clear length field, and proxy-detector
+  overfitting of selection policies. Whether these are new to the literature still
+  needs a proper search before any claim.
+- The RL contribution is **mostly negative so far, and honestly so**: selection
+  matters, but every strategy tuned on known detectors overfits them, and a learned
+  split does no better than "keep the text short".
 
 ## Limitations
 
 - Few texts per prompt (4 held-out per prompt and budget in the selection
-  experiments); single lucky prompts can dominate a policy's score.
+  experiments, 2 per prompt at the longer sizes); single lucky prompts can
+  dominate a policy's score, and the split experiment's flag rates are unusable.
+- The selection experiments used stego-texts without the line-break fix.
 - 256×256 crops from two small photo sources; pretrained CNNs were trained on
   512×512 ALASKA2 photos, so they are mismatched by design.
 - Selection uses cached measurements with linear interpolation between payload
