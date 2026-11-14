@@ -36,8 +36,8 @@ def test_fill_text_roundtrip(lm, method, secret):
     cfg = system.SendConfig(key=b"k", model_path=DEFAULT_LM, prompt=PROMPTS[0], image_method=method,
                             max_text_tokens=120)
     car = system.send(secret, cover(), cfg, model, tok, msg_id=7)
-    assert car.text_stats.tokens <= 120
-    assert car.text_bytes + car.image_bytes == len(secret)
+    assert car.text_bytes + car.image_bytes == car.payload_bytes
+    assert car.text_bytes >= 16 and car.image_bytes >= 16  # both carriers always hold a share
     rep = system.receive(car.text, car.image, cfg, model, tok)
     assert rep.ok and rep.message == secret
 
@@ -49,7 +49,8 @@ def test_fixed_split_roundtrip(lm, share):
     cfg = system.SendConfig(key=b"k", model_path=DEFAULT_LM, prompt=PROMPTS[2], image_method="hill",
                             text_share=share)
     car = system.send(secret, cover(), cfg, model, tok, msg_id=8)
-    assert car.text_bytes == round(share * len(secret))
+    n = car.payload_bytes
+    assert car.text_bytes == min(max(round(share * n), 16), n - 16)
     rep = system.receive(car.text, car.image, cfg, model, tok)
     assert rep.ok and rep.message == secret
 
@@ -89,8 +90,7 @@ def test_fast_fill_uses_few_encodes(lm, n, monkeypatch):
                             max_text_tokens=100)
     car = system.send(secret, cover(), cfg, model, tok, msg_id=9)
     assert calls["n"] <= 4
-    assert car.text_stats.tokens <= 100
-    assert car.text_bytes + car.image_bytes == len(secret)
+    assert car.text_bytes + car.image_bytes == car.payload_bytes
     rep = system.receive(car.text, car.image, cfg, model, tok)
     assert rep.ok and rep.message == secret
 
@@ -103,3 +103,32 @@ def test_exact_fill_still_available(lm):
     car = system.send(secret, cover(), cfg, model, tok, msg_id=10)
     rep = system.receive(car.text, car.image, cfg, model, tok)
     assert rep.ok and rep.message == secret
+
+
+@pytest.mark.parametrize("secret", [b"", b"x" * 40])
+def test_without_aont_old_behaviour(lm, secret):
+    model, tok = lm
+    cfg = system.SendConfig(key=b"k", model_path=DEFAULT_LM, prompt=PROMPTS[0], image_method="lsbm",
+                            max_text_tokens=120, aont=False)
+    car = system.send(secret, cover(), cfg, model, tok, msg_id=11)
+    assert car.payload_bytes == len(secret) and car.text_bytes + car.image_bytes == len(secret)
+    rep = system.receive(car.text, car.image, cfg, model, tok)
+    assert rep.ok and rep.message == secret
+
+
+def test_one_carrier_alone_is_not_enough(lm):
+    """With the package, even holding the key, one carrier's part opens nothing."""
+    from cmstego import aont, image_channel
+    from cmstego.framing import _unseal
+    model, tok = lm
+    secret = b"Meet at the library at 5pm."
+    cfg = system.SendConfig(key=b"k", model_path=DEFAULT_LM, prompt=PROMPTS[1], image_method="hill")
+    car = system.send(secret, cover(), cfg, model, tok, msg_id=12)
+    img_part = _unseal(image_channel.extract(car.image, b"k", "hill"), b"k", "image").body
+    assert secret not in img_part
+    # pretend the text part were all zeros: the package must not open to the secret
+    fake = bytes(car.text_bytes) + img_part
+    try:
+        assert aont.unpack(fake) != secret
+    except ValueError:
+        pass

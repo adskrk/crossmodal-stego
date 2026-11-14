@@ -28,7 +28,7 @@ from typing import Optional
 
 import numpy as np
 
-from . import image_channel, text_channel
+from . import aont, image_channel, text_channel
 from .framing import ReassemblyReport, join_fragments, split_message
 
 
@@ -42,19 +42,21 @@ class SendConfig:
     top_k: int = 64
     max_text_tokens: int = 150
     text_guard: str = "filter"  # "filter" (subtext-codec) or "retry" (OD-Stega style); experiments found equal detectability, filter is cheaper
-    text_share: Optional[float] = None  # None = fill-text rule; else fraction of secret bytes
+    text_share: Optional[float] = None  # None = fill-text rule; else fraction of the payload for the text
     fill: str = "fast"  # fill-text search: "fast" (sized from measured capacity, 1-3 encodes) or "exact" (bisection)
+    aont: bool = True  # seal the secret in an all-or-nothing package before splitting (see aont.py)
 
 
 @dataclasses.dataclass
 class Carriers:
     text: str
     image: np.ndarray
-    text_bytes: int
-    image_bytes: int
+    text_bytes: int    # payload bytes in the text (package bytes when aont=True)
+    image_bytes: int   # payload bytes in the image
     text_stats: text_channel.TextStats
     image_quality: dict
     seconds: float
+    payload_bytes: int = 0  # bytes actually split: the package, or the raw secret when aont=False
 
 
 def _text_cfg(cfg: SendConfig, limit: Optional[int]) -> text_channel.TextConfig:
@@ -66,44 +68,48 @@ def send(secret: bytes, cover: np.ndarray, cfg: SendConfig, model, tok, msg_id: 
     t0 = time.time()
     msg_id = random.randrange(65536) if msg_id is None else msg_id
     tcfg = _text_cfg(cfg, cfg.max_text_tokens)
+    payload = aont.pack(secret) if cfg.aont else secret
+    lo, hi = aont.split_bounds(len(payload)) if cfg.aont else (0, len(payload))
+
+    def encode_text(t_bytes, limit=True):
+        tf, _ = split_message(payload, t_bytes, msg_id, cfg.key)
+        c = tcfg if limit else dataclasses.replace(tcfg, max_new_tokens=None)
+        return text_channel.encode(tf, c, model, tok, key=cfg.key)
 
     def try_text(t_bytes):
-        tf, _ = split_message(secret, t_bytes, msg_id, cfg.key)
         try:
-            return text_channel.encode(tf, tcfg, model, tok, key=cfg.key)
+            return encode_text(t_bytes)
         except ValueError:  # did not fit within max_text_tokens
             return None
 
     if cfg.text_share is not None:
-        best = int(round(cfg.text_share * len(secret)))
-        tcfg.max_new_tokens = None
-        result = try_text(best)
-        if result is None:
-            raise ValueError("text fragment could not be encoded")
+        best = min(max(int(round(cfg.text_share * len(payload))), lo), hi)
+        result = encode_text(best, limit=False)
     elif cfg.fill == "exact":
-        # Original fill-text search: the most secret bytes whose fragment fits in
+        # Original fill-text search: the most payload bytes whose fragment fits in
         # max_text_tokens, by bisection over the byte count. Every probe is a real
-        # encode, so this needs about log2(len(secret)) + 1 encodes.
-        lo, hi = 0, len(secret)
-        result = try_text(0)
-        if result is None:
-            raise ValueError("even an empty text fragment does not fit; raise max_text_tokens")
-        best = 0
-        while lo < hi:
-            mid = (lo + hi + 1) // 2
-            r = try_text(mid)
-            if r is not None:
-                lo, best, result = mid, mid, r
-            else:
-                hi = mid - 1
+        # encode, so this needs about log2(len(payload)) + 1 encodes.
+        result = try_text(lo)
+        best = lo
+        if result is None:  # even the minimum share overflows: let the text run longer
+            result = encode_text(lo, limit=False)
+        else:
+            a, b = lo, hi
+            while a < b:
+                mid = (a + b + 1) // 2
+                r = try_text(mid)
+                if r is not None:
+                    a, best, result = mid, mid, r
+                else:
+                    b = mid - 1
     else:
-        best, result = _fast_fill(secret, msg_id, cfg, tcfg, model, tok)
+        best, result = _fast_fill(payload, lo, hi, msg_id, cfg, tcfg, model, tok, encode_text)
 
     text, tstats = result
-    _, imf = split_message(secret, best, msg_id, cfg.key)
+    _, imf = split_message(payload, best, msg_id, cfg.key)
     stego = image_channel.embed(cover, imf, cfg.key, cfg.image_method)
-    return Carriers(text, stego, best, len(secret) - best, tstats,
-                    image_channel.quality(cover, stego), time.time() - t0)
+    return Carriers(text, stego, best, len(payload) - best, tstats,
+                    image_channel.quality(cover, stego), time.time() - t0, len(payload))
 
 
 def receive(text: Optional[str], image: Optional[np.ndarray], cfg: SendConfig, model, tok) -> ReassemblyReport:
@@ -118,40 +124,45 @@ def receive(text: Optional[str], image: Optional[np.ndarray], cfg: SendConfig, m
             imf = image_channel.extract(image, cfg.key, cfg.image_method)
     except Exception:
         imf = None
-    return join_fragments(tf, imf, cfg.key)
+    rep = join_fragments(tf, imf, cfg.key)
+    if rep.ok and cfg.aont:
+        try:
+            rep.message = aont.unpack(rep.message)
+        except ValueError as exc:
+            rep.ok, rep.message, rep.reason = False, None, f"package did not open: {exc}"
+    return rep
 
 
 _MARGIN = 0.92        # aim this far below the measured capacity
 _MAX_ATTEMPTS = 4
 
 
-def _fast_fill(secret: bytes, msg_id: int, cfg: SendConfig, tcfg, model, tok):
+def _fast_fill(payload: bytes, lo: int, hi: int, msg_id: int, cfg: SendConfig, tcfg, model, tok, encode_text):
     """Fill-text split sized from measured capacity instead of bisection.
 
-    Attempt 1 offers the whole secret. If it fits, that is the answer (one
-    encode). If not, the coder reports how many payload bits it had placed when
-    it ran out of tokens; that is this passage's measured capacity, and the next
-    attempt offers ``_MARGIN`` of it. Usually 1 encode for short secrets and 2
-    for long ones, versus ~log2(n)+1 for bisection. The text may hold a few
-    bytes less than the exact maximum; the image takes the rest, so recovery is
-    unaffected.
+    Attempt 1 offers the most the text may take (``hi``). If it fits, that is
+    the answer (one encode). If not, the coder reports how many payload bits it
+    had placed when it ran out of tokens; that is this passage's measured
+    capacity, and the next attempt offers ``_MARGIN`` of it. Usually 1 encode
+    for short secrets and 2 for long ones, versus ~log2(n)+1 for bisection. If
+    even the minimum share ``lo`` does not fit in ``max_text_tokens``, the text
+    is allowed to run longer so that both carriers still hold their share.
     """
-    base = text_channel.payload_bit_length(len(split_message(secret, 0, msg_id, cfg.key)[0]), cfg.key)
+    base = text_channel.payload_bit_length(len(split_message(payload, 0, msg_id, cfg.key)[0]), cfg.key)
 
     def bytes_for(bit_budget: float) -> int:
-        return max(0, min(len(secret), int((bit_budget - base) // 8)))
+        return max(0, min(hi, int((bit_budget - base) // 8)))
 
-    size, margin = len(secret), _MARGIN
+    size, margin = hi, _MARGIN
     for _ in range(_MAX_ATTEMPTS):
-        tf, _ = split_message(secret, size, msg_id, cfg.key)
         try:
-            return size, text_channel.encode(tf, tcfg, model, tok, key=cfg.key)
+            return size, encode_text(size)
         except text_channel.CapacityExceeded as e:
             nxt = bytes_for(margin * e.bits_done)
             margin *= 0.9
         except ValueError:  # e.g. the retry guard found no clean tokenisation
             nxt = int(size * 0.8)
-        if size == 0:
+        if size <= lo:
             break
-        size = min(nxt, size - 1)
-    raise ValueError("could not fit a text fragment; raise max_text_tokens")
+        size = max(lo, min(nxt, size - 1))
+    return lo, encode_text(lo, limit=False)

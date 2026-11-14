@@ -52,10 +52,11 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     open(os.path.join(args.out, "stego.txt"), "w").write(car.text)
     Image.fromarray(car.image).save(os.path.join(args.out, "stego.png"))
-    print(f"  text  channel: {car.text_bytes} secret bytes in {car.text_stats.tokens} tokens "
+    print(f"  package: {len(secret)}-byte secret sealed into {car.payload_bytes} bytes (all-or-nothing: neither part opens alone)")
+    print(f"  text  channel: {car.text_bytes} package bytes in {car.text_stats.tokens} tokens "
           f"({car.text_stats.bits_per_token:.2f} payload bits/token incl. header; "
           f"KL {car.text_stats.kl_bits_per_token:.4f} bits/token)")
-    print(f"  image channel: {car.image_bytes} secret bytes, method {args.method}, "
+    print(f"  image channel: {car.image_bytes} package bytes, method {args.method}, "
           f"PSNR {car.image_quality['psnr_db']:.1f} dB, SSIM {car.image_quality['ssim']:.4f}, "
           f"{100*car.image_quality['change_rate']:.2f}% of colour values changed")
     print(f"  SPA estimate of LSB-replacement payload: cover {spa_score(cover):.3f}, stego {spa_score(car.image):.3f}")

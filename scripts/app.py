@@ -53,7 +53,8 @@ def build(model_path):
             f.write(car.text)
         q, s = car.image_quality, car.text_stats
         report = (
-            f"Secret: {len(secret.encode())} bytes, split as {car.text_bytes} in the text + {car.image_bytes} in the image\n"
+            f"Secret: {len(secret.encode())} bytes, sealed into a {car.payload_bytes}-byte all-or-nothing package "
+            f"(neither part opens alone), split as {car.text_bytes} in the text + {car.image_bytes} in the image\n"
             f"Text:  {s.tokens} tokens, {s.bits_per_token:.2f} payload bits/token, KL {s.kl_bits_per_token:.4f} bits/token\n"
             f"Image: {cover.shape[1]}x{cover.shape[0]}, method {method}, PSNR {q['psnr_db']:.1f} dB, "
             f"SSIM {q['ssim']:.4f}, {100*q['change_rate']:.2f}% of colour values changed\n"
@@ -102,7 +103,7 @@ def build(model_path):
                     secret = gr.Textbox(label="Secret message", lines=3)
                     key = gr.Textbox(label="Shared key", value="demo-shared-key")
                     method = gr.Radio(["hill", "lsbm", "lsbr"], value="hill", label="Image method")
-                    max_tokens = gr.Slider(40, 200, value=100, step=10, label="Max text length (tokens)")
+                    max_tokens = gr.Slider(60, 250, value=150, step=10, label="Target text length (tokens)")
                     hide_btn = gr.Button("Hide secret", variant="primary")
             report = gr.Textbox(label="Measurements", lines=4)
             with gr.Row():

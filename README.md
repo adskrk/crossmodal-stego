@@ -9,14 +9,18 @@ selection) is compared across simple baselines and PPO.
 
 ## How it works
 
-1. **Split and frame.** The secret is cut into a text fragment and an image
-   fragment. The text gets as many bytes as fit in a short passage
-   (`max_text_tokens`); the sender first offers the whole secret and, if it does
-   not fit, uses the coder's measured capacity to size a second attempt, so a
-   send needs 1-2 text encodes. The image takes the rest. Each gets a header with a message id, offset, total length and CRC32,
-   and is whitened by XOR with a SHAKE-256 keystream from the shared key. Whitening
-   makes the bits look random for the text coder; it is not claimed as
-   encryption-grade security.
+1. **Seal, split and frame.** The secret is first sealed into an all-or-nothing
+   package (Rivest's package transform, built from SHAKE-256/SHA-256): a fresh
+   random key locks it and is mixed into the locked data, so either carrier's
+   part alone opens nothing. The package is then cut in two, with at least 16
+   bytes in each carrier. The text gets as much as fits in a short passage
+   (`max_text_tokens`): the sender offers the most it may take and, if that
+   overflows, uses the coder's measured capacity to size a second attempt, so a
+   send needs 1-2 text encodes. The image takes the rest. Each fragment gets a
+   header with a message id, offset, total length and CRC32, and is whitened by
+   XOR with a SHAKE-256 keystream from the shared key. Whitening makes the bits
+   look random for the text coder; it is not claimed as encryption-grade
+   security.
 2. **Text channel.** Arithmetic coding over the language model's next-token
    probabilities turns the fragment into text. The bitstream starts with a random
    32-bit nonce, and the rest is whitened with SHAKE-256 of the key and nonce. An
@@ -25,8 +29,8 @@ selection) is compared across simple baselines and PPO.
    low-cost set of ±1 changes that carries the fragment. Every stego image is
    decoded once after embedding (verify after embed), and payloads above a photo's
    capacity are refused.
-4. **Receiver.** It decodes the text, extracts the image fragment, checks the CRCs
-   and joins the fragments. If a carrier is damaged, it reports which one failed.
+4. **Receiver.** It decodes the text, extracts the image fragment, checks the CRCs,
+   joins the fragments and opens the package. If a carrier is damaged, it reports which one failed.
 
 `docs/EXPLAINER.md` explains each part in plain language.
 

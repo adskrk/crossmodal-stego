@@ -4,8 +4,10 @@
 
 ## 1. The big picture
 
-One secret message is cut into two pieces. One piece hides inside a paragraph
-written by a language model; the other hides inside a colour photo. Neither
+One secret message is first sealed into an *all-or-nothing package*, and the
+package is cut into two pieces. One piece hides inside a paragraph written by a
+language model; the other hides inside a colour photo. Either piece alone opens
+nothing. Neither
 carrier looks like it is hiding anything. The receiver, who shares a key and
 the same model, pulls both pieces out and checks that they join back into the
 exact original message.
@@ -16,13 +18,42 @@ that by choosing *which* photo, *which* prompt and *how aggressive* the text
 coding is?**
 
 ```
-secret ──► framing ──► split ──► text fragment ──► LLM arithmetic coder ──► stego-text ─┐
-                              └► image fragment ─► HILL + STC embedding ──► stego-image ┤
+secret ──► package ──► framing ──► split ──► text fragment ──► LLM arithmetic coder ──► stego-text ─┐
+                                          └► image fragment ─► HILL + STC embedding ──► stego-image ┤
                                                                                         ▼
                                                      pooled warden (text eye + image eye)
                                                                                         │
-receiver: decode text, extract image, check CRCs, join ──► exact secret  ◄──────────────┘
+receiver: decode text, extract image, check CRCs, join, open package ──► exact secret  ◄──────────────┘
 ```
+
+---
+
+## 2a. All-or-nothing package (`src/cmstego/aont.py`)
+
+**What it does.** Before anything is split, the secret is locked with a fresh
+random 16-byte key, and the key is then mixed into the locked data using a hash
+of that data. The result (the *package*) is the secret plus 18 bytes (16 for the
+mixed-in key, 2 for the length; very short secrets are padded up to 32 bytes).
+
+**Example.** `Meet at the library at 5pm` (26 bytes) becomes a 44-byte package
+that looks like random bytes. If 20 package bytes go into the text and 24 into
+the image, someone holding only one of the two parts cannot open anything,
+because opening needs *every* byte.
+
+**Why.** Before this, a fragment was a readable slice of the secret (under the
+whitening), and a short secret could fit entirely in the text, leaving the image
+unused. Now both carriers always hold at least 16 package bytes, neither part
+reveals anything on its own, and *where* the package is cut is a free choice,
+which is what lets a policy choose the split for low detectability.
+
+**Where it comes from.** This is Rivest's package transform ("All-or-nothing
+encryption and the package transform", FSE 1997), built here from SHAKE-256 and
+SHA-256 instead of a block cipher. It is a known technique, not our invention;
+using it to make a cross-modal split all-or-nothing is the design choice. It has
+not had an independent security review. `aont=False` restores the old split.
+
+**Cost.** 18 extra bytes per message, and the text must carry at least 16 package
+bytes, so its paragraph is never shorter than about 120-130 GPT-2 tokens.
 
 ---
 
@@ -153,9 +184,11 @@ innocent carriers?"). The warden flags a pair if either p-value is below 2.5%
 **The decision.** For each message: pick 1 of 8 candidate photos, 1 of 4
 candidate prompts, and C from {0, 0.02, 0.05, 0.1}.
 
-**Why RL here and not for the split.** If the text coder at C = 0 is close to
+**Why RL here and not (yet) for the split.** If the text coder at C = 0 is close to
 undetectable, the best split is simple: fill a natural-length text, put the
-rest in the image. What actually changes detectability is *which* carriers you
+rest in the image. (The results so far used this rule. With the all-or-nothing
+package, any split is equally safe for confidentiality, so letting the policy
+choose the split for low detectability is the next step.) What actually changes detectability is *which* carriers you
 use. RL learns that choice from cheap features (image texture, brightness,
 prompt entropy) without embedding into every candidate.
 
