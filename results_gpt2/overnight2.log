@@ -1,0 +1,100 @@
+Started 14-11-2026 22:12:44.60 
+==== [1/6] Line-break fix on GPT-2 (about 25 min) ==== 
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights:   5%|▌         | 8/148 [00:00<00:02, 61.89it/s]Loading weights:  10%|█         | 15/148 [00:00<00:02, 56.84it/s]Loading weights:  20%|██        | 30/148 [00:00<00:01, 82.21it/s]Loading weights:  28%|██▊       | 41/148 [00:00<00:01, 87.91it/s]Loading weights:  34%|███▍      | 50/148 [00:00<00:01, 75.73it/s]Loading weights:  39%|███▉      | 58/148 [00:01<00:01, 45.54it/s]Loading weights: 100%|██████████| 148/148 [00:01<00:00, 144.17it/s]
+C=0.0: done (1297s)
+encode failures: 0
+C=0.0 ngram: AUC 0.515 on 48 held-out pairs
+C=0.0 likelihood: AUC 0.516 on 48 held-out pairs
+total 1358s
+C=0.0 style: AUC 0.513 on 48 held-out pairs
+wrote results_gpt2\text_nlfix_heldout_scores_style.csv
+==== [2/6] Fingerprint check on GPT-2 (about 10 min) ==== 
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights:   7%|▋         | 11/148 [00:00<00:01, 75.47it/s]Loading weights:  14%|█▍        | 21/148 [00:00<00:01, 82.53it/s]Loading weights:  21%|██        | 31/148 [00:00<00:01, 85.74it/s]Loading weights:  27%|██▋       | 40/148 [00:00<00:01, 59.94it/s]Loading weights:  32%|███▏      | 47/148 [00:01<00:02, 34.25it/s]Loading weights: 100%|██████████| 148/148 [00:01<00:00, 144.33it/s]
+{'feature': 'mean log-prob', 'cover_mean': np.float64(-2.660167311882422), 'stego_mean': np.float64(-2.7929992929574188), 'single_feature_auc': 0.6537543402777777}
+{'feature': 'std log-prob', 'cover_mean': np.float64(1.8798119476566615), 'stego_mean': np.float64(1.9953319298841816), 'single_feature_auc': 0.7202690972222222}
+{'feature': '10th pct log-prob', 'cover_mean': np.float64(-5.361486669588835), 'stego_mean': np.float64(-5.437742564158007), 'single_feature_auc': 0.5620659722222222}
+{'feature': 'median log-prob', 'cover_mean': np.float64(-2.3783561193881098), 'stego_mean': np.float64(-2.5522027524825965), 'single_feature_auc': 0.63671875}
+{'feature': 'share of tokens outside top-k', 'cover_mean': np.float64(0.0014995787789912798), 'stego_mean': np.float64(0.0), 'single_feature_auc': 0.5208333333333333}
+{'feature': 'share of top-1 tokens', 'cover_mean': np.float64(0.395732738706939), 'stego_mean': np.float64(0.3749057087402461), 'single_feature_auc': 0.5935872395833334}
+{'feature': 'mean surprise minus entropy', 'cover_mean': np.float64(-0.9083136737582201), 'stego_mean': np.float64(-0.7842612677218385), 'single_feature_auc': 0.6557074652777778}
+{'feature': 'texts with >=1 token outside top-k', 'cover_mean': 4, 'stego_mean': 0, 'single_feature_auc': 96}
+{'feature': 'texts with a blank line', 'cover_mean': 68, 'stego_mean': 4, 'single_feature_auc': 96}
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights:   1%|▏         | 2/148 [00:00<00:15,  9.21it/s]Loading weights:   2%|▏         | 3/148 [00:00<00:33,  4.35it/s]Loading weights:   3%|▎         | 4/148 [00:00<00:34,  4.22it/s]Loading weights:   3%|▎         | 5/148 [00:00<00:28,  5.10it/s]Loading weights:   4%|▍         | 6/148 [00:01<00:23,  5.92it/s]Loading weights:   5%|▍         | 7/148 [00:01<00:22,  6.31it/s]Loading weights:   9%|▉         | 13/148 [00:01<00:07, 16.90it/s]Loading weights:  10%|█         | 15/148 [00:01<00:14,  9.33it/s]Loading weights:  11%|█▏        | 17/148 [00:02<00:14,  9.23it/s]Loading weights:  13%|█▎        | 19/148 [00:02<00:16,  8.00it/s]Loading weights:  14%|█▍        | 21/148 [00:03<00:22,  5.58it/s]Loading weights:  15%|█▍        | 22/148 [00:03<00:21,  5.77it/s]Loading weights:  17%|█▋        | 25/148 [00:03<00:16,  7.28it/s]Loading weights:  20%|█▉        | 29/148 [00:04<00:18,  6.61it/s]Loading weights: 100%|██████████| 148/148 [00:04<00:00, 35.53it/s]
+{'feature': 'mean log-prob', 'cover_mean': np.float64(-2.6490055737555793), 'stego_mean': np.float64(-2.675421122806102), 'single_feature_auc': 0.5432942708333333}
+{'feature': 'std log-prob', 'cover_mean': np.float64(1.883639931956268), 'stego_mean': np.float64(1.8687482298501978), 'single_feature_auc': 0.5116102430555556}
+{'feature': '10th pct log-prob', 'cover_mean': np.float64(-5.361525355358747), 'stego_mean': np.float64(-5.325551362541163), 'single_feature_auc': 0.5066189236111112}
+{'feature': 'median log-prob', 'cover_mean': np.float64(-2.356068478827497), 'stego_mean': np.float64(-2.425430598396853), 'single_feature_auc': 0.5659722222222222}
+{'feature': 'share of tokens outside top-k', 'cover_mean': np.float64(0.001581421604218965), 'stego_mean': np.float64(0.0034604705387124776), 'single_feature_auc': 0.5885959201388888}
+{'feature': 'share of top-1 tokens', 'cover_mean': np.float64(0.39959843288655383), 'stego_mean': np.float64(0.39122708846885695), 'single_feature_auc': 0.5544704861111112}
+{'feature': 'mean surprise minus entropy', 'cover_mean': np.float64(-0.902539665311461), 'stego_mean': np.float64(-0.9021349263621952), 'single_feature_auc': 0.510959201388889}
+{'feature': 'texts with >=1 token outside top-k', 'cover_mean': 5, 'stego_mean': 23, 'single_feature_auc': 96}
+{'feature': 'texts with a blank line', 'cover_mean': 69, 'stego_mean': 67, 'single_feature_auc': 96}
+==== [3/6] Longer texts: 64-byte fragments (about 30 min) ==== 
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights:   3%|▎         | 5/148 [00:00<00:03, 43.08it/s]Loading weights:  15%|█▍        | 22/148 [00:00<00:01, 110.95it/s]Loading weights:  23%|██▎       | 34/148 [00:00<00:01, 111.37it/s]Loading weights:  31%|███       | 46/148 [00:00<00:01, 54.60it/s] Loading weights: 100%|██████████| 148/148 [00:00<00:00, 203.80it/s]
+C=0.0: done (1252s)
+encode failures: 0
+C=0.0 ngram: AUC 0.540 on 24 held-out pairs
+C=0.0 likelihood: AUC 0.825 on 24 held-out pairs
+total 1296s
+C=0.0 style: AUC 0.752 on 24 held-out pairs
+wrote results_gpt2\len64\text_filter_heldout_scores_style.csv
+==== [4/6] Longer texts: 160-byte fragments (about 70 min) ==== 
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights:  11%|█         | 16/148 [00:00<00:00, 151.75it/s]Loading weights:  22%|██▏       | 32/148 [00:00<00:00, 149.41it/s]Loading weights:  32%|███▏      | 47/148 [00:00<00:00, 114.82it/s]Loading weights:  41%|████      | 60/148 [00:00<00:01, 78.51it/s] Loading weights: 100%|██████████| 148/148 [00:00<00:00, 227.56it/s]
+C=0.0: done (2962s)
+encode failures: 0
+C=0.0 ngram: AUC 0.502 on 24 held-out pairs
+C=0.0 likelihood: AUC 0.812 on 24 held-out pairs
+total 3053s
+C=0.0 style: AUC 0.707 on 24 held-out pairs
+wrote results_gpt2\len160\text_filter_heldout_scores_style.csv
+==== [5/6] Split experiment: RL choosing the text share (about 20 min) ==== 
+sizes [24, 64, 160] (mean tokens [81, 173, 409]), wardens ['A', 'B', 'ENS'] (36s)
+PPO vs A trained in 263s
+PPO vs ENS trained in 271s
+ split strategy warden  mean_suspicion  flag_rate  evaluations_per_message
+  test min-text      A           0.547      0.000                      1.0
+  test min-text      B           0.692      0.258                      1.0
+  test min-text    ENS           0.867      0.000                      1.0
+  test max-text      A           0.579      0.000                      1.0
+  test max-text      B           0.884      0.000                      1.0
+  test max-text    ENS           0.822      0.000                      1.0
+  test   random      A           0.626      0.011                      1.0
+  test   random      B           0.855      0.111                      1.0
+  test   random    ENS           0.823      0.056                      1.0
+  test   grid-A      A           0.098      0.000                     96.0
+  test   grid-A      B           0.845      0.014                     96.0
+  test   grid-A    ENS           0.811      0.013                     96.0
+  test    ppo-A      A           0.631      0.000                      1.0
+  test    ppo-A      B           0.836      0.039                      1.0
+  test    ppo-A    ENS           0.890      0.108                      1.0
+  test grid-ens      A           0.426      0.000                     96.0
+  test grid-ens      B           0.831      0.021                     96.0
+  test grid-ens    ENS           0.508      0.000                     96.0
+  test  ppo-ens      A           0.543      0.010                      1.0
+  test  ppo-ens      B           0.884      0.144                      1.0
+  test  ppo-ens    ENS           0.714      0.062                      1.0
+test_B min-text      A           0.852      0.011                      1.0
+test_B min-text      B           0.678      0.258                      1.0
+test_B min-text    ENS           0.905      0.193                      1.0
+test_B max-text      A           0.852      0.011                      1.0
+test_B max-text      B           0.880      0.000                      1.0
+test_B max-text    ENS           0.880      0.193                      1.0
+test_B   random      A           0.845      0.077                      1.0
+test_B   random      B           0.823      0.103                      1.0
+test_B   random    ENS           0.886      0.129                      1.0
+test_B   grid-A      A           0.439      0.000                     96.0
+test_B   grid-A      B           0.806      0.109                     96.0
+test_B   grid-A    ENS           0.764      0.052                     96.0
+test_B    ppo-A      A           0.869      0.012                      1.0
+test_B    ppo-A      B           0.783      0.000                      1.0
+test_B    ppo-A    ENS           0.893      0.193                      1.0
+test_B grid-ens      A           0.551      0.000                     96.0
+test_B grid-ens      B           0.795      0.048                     96.0
+test_B grid-ens    ENS           0.602      0.000                     96.0
+test_B  ppo-ens      A           0.791      0.007                      1.0
+test_B  ppo-ens      B           0.822      0.000                      1.0
+test_B  ppo-ens    ENS           0.836      0.212                      1.0
+total 667s
+==== [6/6] Rebuilding docs\RESULTS.md and the figures ==== 
+wrote docs/RESULTS.md
+Finished 15-11-2026  0:06:50.65 
