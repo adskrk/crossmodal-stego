@@ -3,7 +3,7 @@
 **Project:** Reinforcement learning and LLMs for cross-modal steganography.
 One secret is sealed into an all-or-nothing package and split between a
 GPT-2-written paragraph and an RGB photo; a pooled warden inspects both; the
-sender chooses carriers (and, next, the split) to stay unnoticed.
+sender chooses carriers to stay unnoticed.
 
 All experiment numbers below come from `docs/RESULTS.md`, which
 `scripts/make_report.py` builds from saved outputs. Small scale: 195 photo
@@ -21,7 +21,7 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 | Detectors: SPA, 3 pretrained CNNs, SPAM-LR, n-gram, likelihood, style | done | AUC, P_E and detection at 5% false alarms, with 95% intervals |
 | Pooled warden (p-value fusion, 5% false alarms) | done | used in the selection experiments |
 | Carrier selection: baselines, grid search, PPO; one warden and an ensemble | done | held-out evaluation, unseen warden |
-| Runs natively on Windows (Python 3.11) | done | 76 / 76 tests on the author's laptop before this update |
+| Runs natively on Windows (Python 3.11) | done | 87 / 87 tests on the author's Windows laptop |
 
 ## Findings (measured, not assumed)
 
@@ -43,10 +43,10 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
    halve them back. Final GPT-2 run (192 messages, 96 test pairs): blank lines match
    (75% vs 71%), style detector 0.50 (chance), **white-box detector 0.60
    [0.52, 0.69]**, catching 3% of stego-texts at a 5% false-alarm rate (chance
-   level), for about 1% less capacity (2.38 vs 2.39 bits/token). Not perfect: the
-   white-box and n-gram detectors stay just above 0.5 in AUC. A first, smaller run
-   (48 pairs) had suggested 0.52; the larger run is the one to quote. The fix is
-   the default.
+   level), for less than 1% less capacity (2.38 vs 2.39 bits/token). Not perfect:
+   the white-box and n-gram detectors stay just above 0.5 in AUC. A first, smaller
+   run (48 pairs) had suggested 0.52; the larger run is the one to quote. The fix
+   is the default.
 4. **A capacity bug in HILL + STC on real photos, found and fixed.** Photos with
    blown-out or flat regions broke pySTC silently; a per-photo capacity rule plus
    verify-after-embed now refuses such payloads (205 refusals, 0 broken images).
@@ -62,8 +62,10 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
    - PPO with the scoring policy, trained only against warden A: A's flag rate
      0.7% vs 15.5% for no selection; unseen warden B 2.8% vs 4.1% on unseen Kodak
      photos, and 0.2% vs 7.6% on the unseen photo source; also lower than no
-     selection under wardens C and D, which it never saw. **The first learned policy
-     here that does not overfit its training detector** (one seed so far);
+     selection under the warden ensemble (A, C, D combined: 12% vs 22% and 18% vs
+     29%), whose C and D parts it never saw; C and D were not evaluated
+     separately. **The first learned policy here that does not overfit its
+     training detector** (one seed so far);
    - grid search still overfits: 0% under A, 35% under B, mostly by choosing C = 0.1;
    - PPO trained against the ensemble learned poorly (32% under A);
    - the heuristic is perfect under B but the worst under A.
@@ -78,10 +80,10 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
    bisection cut sending time about 5× on GPT-2 (1,000-byte secret: 93 s → 16 s;
    one line: 51 s → 10 s), measured with `scripts/bench_send.py` on the laptop.
 
-## What is new here, honestly stated
+## What is new here
 
 - Splitting a secret across carriers is **not** new (batch steganography,
-  multimodal allocation papers), and the package transform is Rivest's (1997).
+  multimodal allocation papers), and the package transform is Rivest's.
 - What this implementation adds: a **text + image** system whose split is
   all-or-nothing, judged by a **pooled warden with independent detector sets**;
   a **simple, measured fix for the blank-line form of the tokenisation
@@ -91,8 +93,9 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
   overfitting of selection policies. Whether these are new to the literature still
   needs a proper search before any claim.
 - The RL contribution: search-based selection overfits the detectors it is tuned
-  on, but a PPO scoring policy trained against one warden generalised to three
-  unseen ones in the final run (one seed, to be repeated). A learned split did no
+  on, but a PPO scoring policy trained against one warden stayed below no
+  selection under the fully unseen warden B and under a warden ensemble it was not
+  trained on, in the final run (one seed, to be repeated). A learned split did no
   better than "keep the text short".
 
 ## Limitations
@@ -100,10 +103,14 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 - Few texts per prompt in the first selection runs (4 held-out per prompt and
   budget; 8 in the final run) and at the longer split sizes (2), where the flag
   rates are unusable.
-- The final PPO result is from one training seed.
+- The final PPO result is from one training seed, and wardens C and D were only
+  evaluated as part of the ensemble.
+- The line-break fix lowers but does not remove detectability: the white-box and
+  n-gram detectors stay at AUC 0.60, slightly above chance. A weaker trace remains:
+  in the first 48-pair run, 23 of 96 fixed stego-texts (vs 5 of 96 ordinary texts)
+  contained a token outside the model's top 64 when re-read.
+- The split experiment used stego-texts without the line-break fix.
 - 256×256 crops from two small photo sources; pretrained CNNs were trained on
   512×512 ALASKA2 photos, so they are mismatched by design.
 - Selection uses cached measurements with linear interpolation between payload
   rates; final claims need fresh end-to-end encodes.
-- No robustness to editing or recompression: both carriers are exact-bit schemes.
-- The lock-box construction has not had an independent security review.
