@@ -18,12 +18,34 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from cmstego import aont, image_channel, system, text_channel  # noqa: E402
+from cmstego import aont, fileio, image_channel, system, text_channel  # noqa: E402
 from cmstego.prompts import PROMPTS  # noqa: E402
 
 OUT = "app_out"
 SIZES = ["512", "768", "1024", "1536", "original"]  # longest side of the cover, in pixels
 METHOD_NAMES = {aont.RAW: "not compressed", aont.DEFLATE: "deflate", aont.BZ2: "bz2"}
+IMAGE_METHODS = ["hill", "robust", "lsbm", "lsbr"]
+ATTACKS = ["none", "JPEG quality 90", "JPEG quality 75", "Gaussian noise (sigma 1)", "Salt & pepper (1%)",
+           "Median filter 3x3"]
+
+
+def apply_attack(image: np.ndarray, name: str) -> np.ndarray:
+    rng = np.random.default_rng()
+    if name.startswith("JPEG"):
+        buf = io.BytesIO()
+        Image.fromarray(image).save(buf, format="JPEG", quality=int(name.split()[-1]))
+        return np.asarray(Image.open(buf).convert("RGB"))
+    if name.startswith("Gaussian"):
+        return np.clip(np.round(image + rng.normal(0, 1, image.shape)), 0, 255).astype(np.uint8)
+    if name.startswith("Salt"):
+        out = image.copy()
+        hit = rng.random(image.shape) < 0.01
+        out[hit] = rng.choice([0, 255], size=int(hit.sum())).astype(np.uint8)
+        return out
+    if name.startswith("Median"):
+        from scipy import ndimage
+        return np.stack([ndimage.median_filter(image[..., k], size=3) for k in range(3)], axis=-1)
+    return image
 
 
 def build(model_path):
@@ -39,7 +61,7 @@ def build(model_path):
             raise gr.Error("Upload a cover photo first.")
         if not secret:
             raise gr.Error("Type a secret message.")
-        im = Image.fromarray(photo).convert("RGB")
+        im = Image.open(photo).convert("RGB")
         if size != "original":
             im.thumbnail((int(size), int(size)))
         cover = np.asarray(im)
@@ -52,7 +74,7 @@ def build(model_path):
         cap_bytes = image_channel.capacity_bits(cover, method) // 8
         os.makedirs(OUT, exist_ok=True)
         png, txt = os.path.join(OUT, "stego.png"), os.path.join(OUT, "stego.txt")
-        Image.fromarray(car.image).save(png)
+        fileio.save_like(car.image, photo, png)  # keeps the original's alpha channel and metadata
         Image.fromarray(cover).save(os.path.join(OUT, "cover.png"))
         with open(txt, "w", encoding="utf-8") as f:
             f.write(car.text)
@@ -70,7 +92,7 @@ def build(model_path):
         )
         return cover, car.image, car.text, report, [png, txt], png, txt
 
-    def extract(png_file, txt_file, pasted, key, method, jpeg, edit):
+    def extract(png_file, txt_file, pasted, key, method, attack, edit):
         if png_file is None:
             raise gr.Error("Upload the stego image (stego.png).")
         image = np.asarray(Image.open(png_file).convert("RGB"))
@@ -82,11 +104,9 @@ def build(model_path):
         else:
             raise gr.Error("Upload stego.txt or paste the stego text.")
         notes = []
-        if jpeg:
-            buf = io.BytesIO()
-            Image.fromarray(image).save(buf, format="JPEG", quality=90)
-            image = np.asarray(Image.open(buf).convert("RGB"))
-            notes.append("ATTACK: image re-saved as JPEG (quality 90)")
+        if attack != "none":
+            image = apply_attack(image, attack)
+            notes.append(f"ATTACK on the image: {attack}")
         if edit:
             words = text.split(" ")
             words[len(words) // 2] = "banana"
@@ -106,11 +126,15 @@ def build(model_path):
         last_png, last_txt = gr.State(), gr.State()
         with gr.Tab("1. Hide"):
             with gr.Row():
-                photo = gr.Image(label="Cover photo", type="numpy")
+                # A plain file upload keeps the original file as it is (alpha channel and
+                # metadata), so the stego PNG can match it; an image box would re-save it.
+                photo = gr.File(label="Cover photo (PNG keeps its format; JPEG is saved as PNG)",
+                                file_types=["image"], type="filepath")
                 with gr.Column():
                     secret = gr.Textbox(label="Secret message", lines=3)
                     key = gr.Textbox(label="Shared key", value="demo-shared-key")
-                    method = gr.Radio(["hill", "lsbm", "lsbr"], value="hill", label="Image method")
+                    method = gr.Radio(IMAGE_METHODS, value="hill", label="Image method (robust = survives "
+                                      "JPEG and noise, but is easier to detect)")
                     max_tokens = gr.Slider(60, 250, value=150, step=10, label="Target text length (tokens)")
                     size = gr.Radio(SIZES, value="512", label="Photo size (longest side, px). Larger holds more, "
                                     "but hides more slowly")
@@ -129,18 +153,19 @@ def build(model_path):
             pasted = gr.Textbox(label="...or paste the stego text here", lines=4)
             with gr.Row():
                 key2 = gr.Textbox(label="Shared key", value="demo-shared-key")
-                method2 = gr.Radio(["hill", "lsbm", "lsbr"], value="hill", label="Image method")
+                method2 = gr.Radio(IMAGE_METHODS, value="hill", label="Image method")
             with gr.Row():
-                jpeg = gr.Checkbox(label="Simulate attack: re-save image as JPEG")
+                attack = gr.Radio(ATTACKS, value="none", label="Simulate damage to the image")
                 edit = gr.Checkbox(label="Simulate attack: change one word of the text")
             ext_btn = gr.Button("Extract secret", variant="primary")
             recovered = gr.Textbox(label="Recovered secret", lines=3)
             status = gr.Textbox(label="Receiver report", lines=4)
 
         hide_btn.click(hide, [photo, secret, key, method, max_tokens, size],
-                       [cover_out, stego_out, stego_text, report, files, last_png, last_txt])
+                       [cover_out, stego_out, stego_text, report, files, last_png, last_txt]).then(
+            lambda m: m, method, method2)  # the Extract tab follows the method used to hide
         use_last.click(lambda p, t: (p, t), [last_png, last_txt], [png_in, txt_in])
-        ext_btn.click(extract, [png_in, txt_in, pasted, key2, method2, jpeg, edit], [recovered, status])
+        ext_btn.click(extract, [png_in, txt_in, pasted, key2, method2, attack, edit], [recovered, status])
     return app
 
 

@@ -387,3 +387,40 @@ Overfitting to one warden was the main weakness found in section 3, so the same 
 | PPO (scoring policy, vs ensemble) | 0.29 [0.27, 0.32] | 0.43 [0.40, 0.46] | 0.00 [0.00, 0.00] | 0.75 [0.74, 0.77] |
 | PPO v1 (slot-index policy) | 0.19 [0.17, 0.22] | 0.27 [0.24, 0.30] | 0.04 [0.03, 0.05] | 0.69 [0.68, 0.71] |
 
+## 8. Robustness: what survives changes in transit
+
+Payloads of 64 and 400 bytes in 24 Kodak crops (256×256); each stego image was changed once and decoded (`scripts/exp_robustness.py`). JPEG = re-saved at that quality; noise = Gaussian with that standard deviation; S&P = that share of colour values set to 0 or 255; median = 3×3 median filter.
+
+**Share of payloads recovered exactly:**
+
+| Method | Bytes | none | JPEG 95 | JPEG 90 | JPEG 75 | noise σ 0.5 | noise σ 1 | noise σ 2 | S&P 0.1% | S&P 1% | median 3×3 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| HILL + STC | 64 | 100% | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| HILL + STC | 400 | 100% | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| LSB matching | 64 | 100% | 0% | 0% | 0% | 0% | 0% | 0% | 67% | 4% | 0% |
+| LSB matching | 400 | 100% | 0% | 0% | 0% | 0% | 0% | 0% | 12% | 0% | 0% |
+| LSB replacement | 64 | 100% | 0% | 0% | 0% | 0% | 0% | 0% | 67% | 4% | 0% |
+| LSB replacement | 400 | 100% | 0% | 0% | 0% | 0% | 0% | 0% | 21% | 0% | 0% |
+| Robust (DCT-QIM + Reed-Solomon) | 64 | 100% | 100% | 100% | 96% | 100% | 100% | 100% | 96% | 96% | 8% |
+| Robust (DCT-QIM + Reed-Solomon) | 400 | 100% | 100% | 100% | 96% | 100% | 100% | 100% | 92% | 92% | 8% |
+
+**Share of hidden bits that came out wrong** (0.5 = the data is gone), read before any repair: the robust method's receiver also undoes salt & pepper dots and applies Reed-Solomon correction, which is why it recovers payloads despite these raw errors.
+
+| Method | Bytes | none | JPEG 95 | JPEG 90 | JPEG 75 | noise σ 0.5 | noise σ 1 | noise σ 2 | S&P 0.1% | S&P 1% | median 3×3 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| HILL + STC | 64 | 0.000 | 0.498 | 0.498 | 0.502 | 0.504 | 0.495 | 0.494 | 0.487 | 0.505 | 0.501 |
+| HILL + STC | 400 | 0.000 | 0.503 | 0.499 | 0.495 | 0.496 | 0.503 | 0.501 | 0.252 | 0.503 | 0.500 |
+| LSB matching | 64 | 0.000 | 0.498 | 0.507 | 0.495 | 0.303 | 0.493 | 0.498 | 0.001 | 0.005 | 0.417 |
+| LSB matching | 400 | 0.000 | 0.497 | 0.501 | 0.497 | 0.309 | 0.488 | 0.495 | 0.001 | 0.005 | 0.418 |
+| LSB replacement | 64 | 0.000 | 0.500 | 0.496 | 0.500 | 0.312 | 0.488 | 0.496 | 0.001 | 0.005 | 0.422 |
+| LSB replacement | 400 | 0.000 | 0.497 | 0.499 | 0.497 | 0.311 | 0.489 | 0.500 | 0.000 | 0.005 | 0.417 |
+| Robust (DCT-QIM + Reed-Solomon) | 64 | 0.000 | 0.000 | 0.000 | 0.005 | 0.000 | 0.000 | 0.000 | 0.038 | 0.292 | 0.174 |
+| Robust (DCT-QIM + Reed-Solomon) | 400 | 0.000 | 0.000 | 0.000 | 0.003 | 0.000 | 0.000 | 0.000 | 0.041 | 0.292 | 0.174 |
+
+**The price of robustness** (200-byte payload per crop, all 144 Kodak crops, `scripts/exp_robust_detect.py`; SPAM + logistic regression scored out-of-fold by photo):
+
+| Method | PSNR (dB) | Values changed | SPA AUC | SPAM-LR AUC | SPAM-LR caught @5% FA |
+| --- | --- | --- | --- | --- | --- |
+| HILL + STC | 77.3 | 0.1% | 0.50 [0.43, 0.57] | 0.50 [0.43, 0.57] | 6% |
+| Robust (DCT-QIM + Reed-Solomon) | 43.3 | 72.4% | 0.43 [0.36, 0.49] | 1.00 [1.00, 1.00] | 100% |
+

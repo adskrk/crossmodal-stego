@@ -32,7 +32,9 @@ selection) is compared across simple baselines and PPO.
 4. **Receiver.** It decodes the text, extracts the image fragment, checks the CRCs,
    joins the fragments and opens the package. If a carrier is damaged, it reports which one failed.
 
-`docs/EXPLAINER.md` explains each part in plain language.
+`docs/EXPLAINER.md` explains each part in plain language, and
+`docs/CODE_WALKTHROUGH.md` shows which algorithm we started from, what we changed
+and where (file and line).
 
 ## Setup
 
@@ -229,6 +231,21 @@ experiment are not usable: with 24 calibration texts the smallest possible p-val
 | 27 bytes | 50.5 s (6 encodes) | 10.2 s (1 encode) |
 | 1,000 bytes | 92.6 s (11 encodes) | 16.2 s (2 encodes) |
 
+### Robustness (`docs/RESULTS.md`, section 8)
+
+Share of payloads recovered after the stego image is changed (24 Kodak crops):
+
+| Method | JPEG 95 | JPEG 75 | Noise σ 2 | Salt & pepper 1% | Median 3×3 | Trained detector (SPAM-LR AUC) |
+| --- | --- | --- | --- | --- | --- | --- |
+| HILL + STC (default) | 0% | 0% | 0% | 0% | 0% | 0.50 (chance) |
+| Robust prototype (DCT-QIM + Reed-Solomon) | 100% | 96% | 100% | 92–96% | 8% | 1.00 (always caught) |
+
+The default method assumes the image arrives unchanged (sent as a file); damage is
+detected and reported. The robust prototype survives JPEG re-saving, noise and
+salt & pepper but is easy to detect: robustness and undetectability pull against
+each other. Choose `robust` in the app to try it; the Extract tab can apply each
+kind of damage.
+
 ## Reproducing the experiments
 
 ```bash
@@ -240,6 +257,8 @@ python scripts/diag_text_fingerprint.py --model gpt2                # what the w
 python scripts/exp_selection.py                                     # warden + baselines + PPO
 python scripts/make_report.py                                       # docs/RESULTS.md + figures
 python scripts/bench_send.py --model gpt2                           # sender speed: old vs new split search
+python scripts/exp_robustness.py --methods lsbr,lsbm,hill,robust    # JPEG / noise / salt & pepper / median (~1 min)
+python scripts/exp_robust_detect.py                                 # how detectable the robust method is (~5 min)
 python scripts/add_style_detector.py --results results_gpt2         # third text detector (no model needed)
 python scripts/exp_selection.py --results results_gpt2 --ensemble   # selection trained against several wardens
 ```
@@ -280,8 +299,9 @@ Without internet, `python scripts/make_toy_lm.py` builds a tiny offline model in
   are mismatched with them by design.
 - Selection uses cached measurements with linear interpolation between payload
   rates; final claims need fresh end-to-end encodes.
-- There is no robustness to editing or recompression, because both carriers are
-  exact-bit schemes.
+- The default carriers are exact-bit schemes: editing the text, or re-saving or
+  adding noise to a HILL image, loses the secret (detected and reported). The
+  robust prototype survives JPEG and noise but is easy to detect.
 - The lock-box construction has not had an independent security review.
 
 **Next steps**
@@ -291,6 +311,9 @@ Without internet, `python scripts/make_toy_lm.py` builds a tiny offline model in
 - Repeat the PPO training with several seeds.
 - A comparison with another published text coder (e.g. Discop or Meteor).
 - A GPU-trained image detector and a second photo dataset.
+- Robust *and* hard to detect: adaptive robust embedding (sturdier changes only in
+  textured areas), and a JPEG-domain version for chat apps.
+- Text generated from a caption of the cover photo, so text and image match.
 - Speed: reuse measured capacity, and test a faster inference engine.
 
 ## Third-party code

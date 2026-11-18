@@ -17,11 +17,11 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 | Framing: split, headers, CRC, whitening | done | unit tests |
 | Text channel: arithmetic coding + OD-Stega budget + exact KL, line-break fix, natural sentence ending | done | 864 / 864 GPT-2 stego-texts recovered exactly across all runs (1078 / 1078 with the toy model) |
 | Image channel: LSB replacement, LSB matching, HILL + STC on RGB | done | 2135 / 2135 stego images recovered exactly |
-| Sender / receiver, browser app, damage reporting | done | 87 automated tests; JPEG damage reported as "image fragment missing" |
+| Sender / receiver, browser app, damage reporting | done | 99 automated tests; JPEG damage reported as "image fragment missing" |
 | Detectors: SPA, 3 pretrained CNNs, SPAM-LR, n-gram, likelihood, style | done | AUC, P_E and detection at 5% false alarms, with 95% intervals |
 | Pooled warden (p-value fusion, 5% false alarms) | done | used in the selection experiments |
 | Carrier selection: baselines, grid search, PPO; one warden and an ensemble | done | held-out evaluation, unseen warden |
-| Runs natively on Windows (Python 3.11) | done | 87 / 87 tests on the author's Windows laptop |
+| Runs natively on Windows (Python 3.11) | done | 99 / 99 tests on the author's Windows laptop |
 
 ## Findings (measured, not assumed)
 
@@ -79,6 +79,22 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
 8. **Speed.** Sizing the text from the coder's measured capacity instead of a
    bisection cut sending time about 5× on GPT-2 (1,000-byte secret: 93 s → 16 s;
    one line: 51 s → 10 s), measured with `scripts/bench_send.py` on the laptop.
+9. **Robustness: the main method does not survive changes; a robust prototype
+   does, at a price.** Our main image method (HILL + STC) loses the hidden data
+   under every change we tried: JPEG re-saving even at quality 95, noise of σ 0.5,
+   0.1% salt & pepper, a 3×3 median filter (about 50% of bits wrong). The receiver
+   detects this with the CRC and reports which carrier failed; it never returns
+   wrong data. A **robust prototype** (low-frequency DCT coefficients of the
+   brightness in JPEG's 8×8 blocks, dithered QIM, key-shuffled positions,
+   Reed-Solomon codes, salt & pepper repair at the receiver) recovered the payload
+   after JPEG 95 / 90 / 75 (100 / 100 / 96%), Gaussian noise up to σ 2 (100%) and
+   salt & pepper up to 1% (92–96%), but not after median filtering (8%). The price:
+   PSNR 43 dB instead of 77, 72% of values changed instead of 0.1%, and a trained
+   SPAM detector catches it every time (AUC 1.00, vs 0.50 for HILL). Being both
+   robust and undetectable is the open problem.
+10. **File format.** The stego PNG now keeps the original's alpha channel and
+   metadata (colour profile, gamma, resolution); saved the same way, cover and
+   stego files differ in size by about 50 bytes.
 
 ## What is new here
 
@@ -114,3 +130,7 @@ crops, 12 prompts, GPT-2 (124M) on a laptop CPU.
   512×512 ALASKA2 photos, so they are mismatched by design.
 - Selection uses cached measurements with linear interpolation between payload
   rates; final claims need fresh end-to-end encodes.
+- The robust image method is a prototype: robust or undetectable, not yet both,
+  and it does not survive median filtering, resizing or cropping.
+- The default carriers are exact-bit schemes: any edit to the text, or any
+  re-saving or noise on a HILL image, loses the secret (detected and reported).

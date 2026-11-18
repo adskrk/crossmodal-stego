@@ -19,7 +19,10 @@ def covers(n=3):
     return [np.asarray(Image.open(p).convert("RGB")) for p in paths[:n]]
 
 
-@pytest.mark.parametrize("method", ic.METHODS)
+PM1_METHODS = ("lsbr", "lsbm", "hill")  # ±1 methods; the robust method has its own tests (test_robust.py)
+
+
+@pytest.mark.parametrize("method", PM1_METHODS)
 @pytest.mark.parametrize("nbytes", [0, 1, 100, 2000])
 def test_roundtrip(method, nbytes):
     rng = np.random.default_rng(nbytes)
