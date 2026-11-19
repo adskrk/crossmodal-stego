@@ -26,6 +26,9 @@ SIZES = ["512", "768", "1024", "1536", "original"]  # longest side of the cover,
 METHOD_NAMES = {aont.RAW: "not compressed", aont.DEFLATE: "deflate", aont.BZ2: "bz2"}
 IMAGE_METHODS = ["hill", "robust", "lsbm", "lsbr"]
 JPEG_QUALITIES = (85, 90, 92)  # robust stego is saved as JPEG at the lowest of these that still decodes
+CHANNELS = ["As a file (email, Drive, USB): most hidden",
+            "Through WhatsApp / social media: survives compression"]
+AUTO_SIZE = {"hill": 1024, "lsbm": 1024, "lsbr": 1024, "robust": 1280}  # longest side when size is "auto"
 ATTACKS = ["none", "JPEG quality 90", "JPEG quality 75", "Gaussian noise (sigma 1)", "Salt & pepper (1%)",
            "Median filter 3x3"]
 
@@ -49,6 +52,13 @@ def apply_attack(image: np.ndarray, name: str) -> np.ndarray:
     return image
 
 
+def resolve_method(channel: str, override: str) -> str:
+    """'auto' picks the method from how the files will travel."""
+    if override != "auto":
+        return override
+    return "robust" if channel == CHANNELS[1] else "hill"
+
+
 def build(model_path):
     print(f"Loading language model: {model_path}")
     model, tok = text_channel.load_lm(model_path)
@@ -57,20 +67,23 @@ def build(model_path):
         return system.SendConfig(key=key.encode(), model_path=model_path, prompt=PROMPTS[1],
                                  image_method=method, C=0.0, max_text_tokens=int(max_tokens))
 
-    def hide(photo, secret, key, method, max_tokens, size):
+    def hide(photo, secret, key, channel, method_override, max_tokens, size):
         if photo is None:
             raise gr.Error("Upload a cover photo first.")
         if not secret:
             raise gr.Error("Type a secret message.")
+        method = resolve_method(channel, method_override)
         im = Image.open(photo).convert("RGB")
-        if size != "original":
+        if size == "auto":
+            im.thumbnail((AUTO_SIZE[method], AUTO_SIZE[method]))
+        elif size != "original":
             im.thumbnail((int(size), int(size)))
         cover = np.asarray(im)
         try:
             car = system.send(secret.encode(), cover, cfg_for(key, method, max_tokens), model, tok)
         except ValueError as e:
-            raise gr.Error(f"Could not hide the message: {e}. Try a larger photo size, a more detailed photo, "
-                           "or a shorter secret.")
+            raise gr.Error(f"Could not hide the message: {e}. Try a shorter secret, a more detailed photo, "
+                           "or a larger photo size under Advanced options.")
         comp, stored = aont.compress(secret.encode())
         cap_bytes = image_channel.capacity_bits(cover, method) // 8
         os.makedirs(OUT, exist_ok=True)
@@ -115,11 +128,12 @@ def build(model_path):
             f"Saved: {saved_as}, {os.path.getsize(png) / 1024:.0f} KB (cover photo file: {os.path.getsize(photo) / 1024:.0f} KB)\n"
             f"Time:  {car.seconds:.1f} s"
         )
-        return cover, car.image, car.text, report, [png, txt], png, txt
+        return cover, car.image, car.text, report, [png, txt], png, txt, channel, method_override
 
-    def extract(png_file, txt_file, pasted, key, method, attack, edit):
+    def extract(png_file, txt_file, pasted, key, channel, method_override, attack, edit):
         if png_file is None:
-            raise gr.Error("Upload the stego image (stego.png).")
+            raise gr.Error("Upload the stego image (stego.png or stego.jpg).")
+        method = resolve_method(channel, method_override)
         image = np.asarray(Image.open(png_file).convert("RGB"))
         if txt_file is not None:
             with open(txt_file, encoding="utf-8") as f:
@@ -139,7 +153,8 @@ def build(model_path):
             notes.append("ATTACK: one word of the text replaced")
         t = time.time()
         rep = system.receive(text, image, cfg_for(key, method), model, tok)
-        lines = notes + [f"Text fragment ok: {rep.text_ok}    Image fragment ok: {rep.image_ok}    "
+        lines = notes + [f"Image method: {method}",
+                         f"Text fragment ok: {rep.text_ok}    Image fragment ok: {rep.image_ok}    "
                          f"({time.time()-t:.1f} s)"]
         if rep.ok:
             return rep.message.decode(errors="replace"), "\n".join(lines)
@@ -152,17 +167,18 @@ def build(model_path):
         with gr.Tab("1. Hide"):
             with gr.Row():
                 # A plain file upload keeps the original file as it is (alpha channel and
-                # metadata), so the stego PNG can match it; an image box would re-save it.
-                photo = gr.File(label="Cover photo (PNG keeps its format; JPEG is saved as PNG)",
-                                file_types=["image"], type="filepath")
+                # metadata), so the stego can match it; an image box would re-save it.
+                photo = gr.File(label="Cover photo", file_types=["image"], type="filepath")
                 with gr.Column():
                     secret = gr.Textbox(label="Secret message", lines=3)
                     key = gr.Textbox(label="Shared key", value="demo-shared-key")
-                    method = gr.Radio(IMAGE_METHODS, value="hill", label="Image method (robust = survives "
-                                      "JPEG and noise, but is easier to detect)")
-                    max_tokens = gr.Slider(60, 250, value=150, step=10, label="Target text length (tokens)")
-                    size = gr.Radio(SIZES, value="512", label="Photo size (longest side, px). Larger holds more, "
-                                    "but hides more slowly")
+                    channel = gr.Radio(CHANNELS, value=CHANNELS[0], label="How will you send it?")
+                    with gr.Accordion("Advanced options (for experiments and demos)", open=False):
+                        method = gr.Radio(["auto"] + IMAGE_METHODS, value="auto",
+                                          label="Image method (auto: hill for files, robust for chat apps)")
+                        max_tokens = gr.Slider(60, 250, value=150, step=10, label="Target text length (tokens)")
+                        size = gr.Radio(["auto"] + SIZES, value="auto",
+                                        label="Photo size, longest side in px (auto: 1024 for files, 1280 for chat apps)")
                     hide_btn = gr.Button("Hide secret", variant="primary")
             report = gr.Textbox(label="Measurements", lines=6)
             with gr.Row():
@@ -178,19 +194,20 @@ def build(model_path):
             pasted = gr.Textbox(label="...or paste the stego text here", lines=4)
             with gr.Row():
                 key2 = gr.Textbox(label="Shared key", value="demo-shared-key")
-                method2 = gr.Radio(IMAGE_METHODS, value="hill", label="Image method")
-            with gr.Row():
+                channel2 = gr.Radio(CHANNELS, value=CHANNELS[0], label="How was it sent?")
+            with gr.Accordion("Advanced options (for experiments and demos)", open=False):
+                method2 = gr.Radio(["auto"] + IMAGE_METHODS, value="auto", label="Image method")
                 attack = gr.Radio(ATTACKS, value="none", label="Simulate damage to the image")
                 edit = gr.Checkbox(label="Simulate attack: change one word of the text")
             ext_btn = gr.Button("Extract secret", variant="primary")
             recovered = gr.Textbox(label="Recovered secret", lines=3)
             status = gr.Textbox(label="Receiver report", lines=4)
 
-        hide_btn.click(hide, [photo, secret, key, method, max_tokens, size],
-                       [cover_out, stego_out, stego_text, report, files, last_png, last_txt]).then(
-            lambda m: m, method, method2)  # the Extract tab follows the method used to hide
+        # The Extract tab follows the choices used to hide.
+        hide_btn.click(hide, [photo, secret, key, channel, method, max_tokens, size],
+                       [cover_out, stego_out, stego_text, report, files, last_png, last_txt, channel2, method2])
         use_last.click(lambda p, t: (p, t), [last_png, last_txt], [png_in, txt_in])
-        ext_btn.click(extract, [png_in, txt_in, pasted, key2, method2, attack, edit], [recovered, status])
+        ext_btn.click(extract, [png_in, txt_in, pasted, key2, channel2, method2, attack, edit], [recovered, status])
     return app
 
 
