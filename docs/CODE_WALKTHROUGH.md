@@ -81,7 +81,7 @@ Started from: **HILL costs** (Li et al., ICIP 2014) + **syndrome-trellis codes**
 | Capacity rule on *usable* values (not 0/255, not flat) | `usable_values` line 69, `capacity_bits` line 76 | pySTC failed silently on blown-out or flat photos |
 | 1024-value header region for the STC length | line 160, used in `_embed_hill` line 168 | pySTC's own 64-value header could not be embedded on such photos |
 | Verify after embed | `embed`, line 375 | never output an image that cannot be read |
-| **Robust prototype** (new): DCT-domain QIM + Reed-Solomon | `_embed_robust` line 279, `_extract_robust` line 327, `repair_impulses` line 312 | survive JPEG, noise, salt & pepper (see RESULTS.md, robustness) |
+| **Robust prototype** (new): DCT-domain QIM + Reed-Solomon | `_embed_robust` line 289, `_extract_robust` line 337, `repair_impulses` line 322 | survive JPEG, noise, salt & pepper (see RESULTS.md, robustness) |
 
 ## 4. System (`src/cmstego/`)
 
@@ -117,10 +117,34 @@ How the robust prototype works (`image_channel.py`, from line 200):
    low-frequency numbers per block, the parts compression keeps.
 3. Each secret bit moves one of these numbers onto one of two grids, 28 apart
    (QIM). A change smaller than 7 cannot flip the bit.
-4. Positions are shuffled with the key, and Reed-Solomon codes add repair data, so
-   the few bits that do flip are corrected.
+4. The key shuffles the order of the blocks; bits fill one block's 5 numbers before
+   moving to the next, so a short secret touches only the blocks it needs
+   (`_robust_key`, line 248). Reed-Solomon codes add repair data, so the few bits
+   that do flip are corrected.
 5. The receiver first decodes as received; if that fails it removes salt & pepper
    dots (pure black/white pixels that differ from their neighbours) and tries again.
+
+### Can it be robust *and* hidden? (measured, `scripts/exp_robust_sweep.py`)
+
+200-byte image share, 144 Kodak crops for detection, 48 for survival:
+
+| Setting | Pixel values changed | PSNR | JPEG 75 | Salt & pepper 1% | SPAM AUC |
+|---|---|---|---|---|---|
+| Spread over all blocks, grid 28 (old) | 73% | 43.2 dB | 100% | 83% | 1.00 |
+| **Packed, grid 28 (new default)** | **47%** | 43.3 dB | **100%** | **92%** | 1.00 |
+| Packed, grid 20 | 43% | 46.2 dB | 92% | 92% | 1.00 |
+| Packed, grid 14 | 37% | 49.1 dB | 0% | 63% | 1.00 |
+
+Smaller secrets (packed, grid 28): 96 bytes → 25% changed, AUC 0.99;
+32 bytes → 17% changed, AUC 0.96 (87% caught at 5% false alarms), still surviving JPEG 75.
+
+What this means: packing is a free improvement (fewer changes, same or better
+survival), so it is the default. A smaller grid makes changes smaller but breaks
+JPEG survival before it helps hiding. A trained detector still finds every robust
+image: robustness needs strong changes, and strong changes leave a trace. Robust
+*and* undetectable is not solved here; it is an open trade-off, as in the
+literature on robust steganography.
+Note: robust images made before this change cannot be read by the new version.
 
 The default (HILL + STC) detects damage with CRC checks and reports which carrier
 failed (`framing.py` `join_fragments`, line 118); it never returns wrong data.

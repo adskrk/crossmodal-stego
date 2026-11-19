@@ -215,6 +215,11 @@ ROBUST_COEFFS = ((0, 1), (1, 0), (1, 1), (0, 2), (2, 0))
 ROBUST_NSYM = 64
 ROBUST_HEADER_BITS = 16
 ROBUST_HEADER_REPS = 15
+# Packed: bits fill all coefficients of one block before moving to the next block
+# (blocks in key-shuffled order), so a short payload touches only the blocks it
+# needs. Spread: every coefficient position of the image is shuffled, so even a
+# short payload touches nearly every block. Experiments set these two globals.
+ROBUST_PACKED = True
 
 
 def _luma(img: np.ndarray) -> np.ndarray:
@@ -241,7 +246,12 @@ def _robust_coeffs(img: np.ndarray) -> np.ndarray:
 
 
 def _robust_key(n: int, key: bytes):
-    order = np.random.default_rng(_seed(key, "qim-order")).permutation(n)
+    k = len(ROBUST_COEFFS)
+    if ROBUST_PACKED:
+        blocks = np.random.default_rng(_seed(key, "qim-order")).permutation(n // k)
+        order = (blocks[:, None] * k + np.arange(k)).reshape(-1)
+    else:
+        order = np.random.default_rng(_seed(key, "qim-order")).permutation(n)
     dither = np.random.default_rng(_seed(key, "qim-dither")).uniform(0, ROBUST_DELTA, n)
     return order, dither
 
